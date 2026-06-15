@@ -58,6 +58,9 @@ class SimulationState:
     entities_count: int = 0
     profiles_count: int = 0
     entity_types: List[str] = field(default_factory=list)
+
+    # 角色名单模式：用户从"用户库"挑选的角色 ID（为空则使用种子抽取）
+    character_ids: List[str] = field(default_factory=list)
     
     # 配置生成信息
     config_generated: bool = False
@@ -87,6 +90,7 @@ class SimulationState:
             "entities_count": self.entities_count,
             "profiles_count": self.profiles_count,
             "entity_types": self.entity_types,
+            "character_ids": self.character_ids,
             "config_generated": self.config_generated,
             "config_reasoning": self.config_reasoning,
             "current_round": self.current_round,
@@ -107,6 +111,7 @@ class SimulationState:
             "entities_count": self.entities_count,
             "profiles_count": self.profiles_count,
             "entity_types": self.entity_types,
+            "character_ids": self.character_ids,
             "config_generated": self.config_generated,
             "error": self.error,
         }
@@ -178,6 +183,7 @@ class SimulationManager:
             entities_count=data.get("entities_count", 0),
             profiles_count=data.get("profiles_count", 0),
             entity_types=data.get("entity_types", []),
+            character_ids=data.get("character_ids", []),
             config_generated=data.get("config_generated", False),
             config_reasoning=data.get("config_reasoning", ""),
             current_round=data.get("current_round", 0),
@@ -235,7 +241,8 @@ class SimulationManager:
         defined_entity_types: Optional[List[str]] = None,
         use_llm_for_profiles: bool = True,
         progress_callback: Optional[callable] = None,
-        parallel_profile_count: int = 3
+        parallel_profile_count: int = 3,
+        character_ids: Optional[List[str]] = None
     ) -> SimulationState:
         """
         准备模拟环境（全程自动化）
@@ -269,117 +276,187 @@ class SimulationManager:
             
             sim_dir = self._get_simulation_dir(simulation_id)
             
-            # ========== 阶段1: 读取并过滤实体 ==========
-            if progress_callback:
-                progress_callback("reading", 0, t('progress.connectingZepGraph'))
-            
-            reader = ZepEntityReader()
-            
-            if progress_callback:
-                progress_callback("reading", 30, t('progress.readingNodeData'))
-            
-            filtered = reader.filter_defined_entities(
-                graph_id=state.graph_id,
-                defined_entity_types=defined_entity_types,
-                enrich_with_edges=True
-            )
-            
-            state.entities_count = filtered.filtered_count
-            state.entity_types = list(filtered.entity_types)
-            
-            if progress_callback:
-                progress_callback(
-                    "reading", 100,
-                    t('progress.readingComplete', count=filtered.filtered_count),
-                    current=filtered.filtered_count,
-                    total=filtered.filtered_count
+            # ========== 阶段1+2: 准备实体与 Agent Profile ==========
+            # 两种模式：
+            #   A) 名单模式 —— 用户从"用户库"挑选角色（character_ids 非空），不依赖种子抽取
+            #   B) 种子抽取模式 —— 从 Zep 图谱抽取实体并用 LLM 生成人设（原有逻辑）
+            if character_ids:
+                from ..models.character import CharacterManager
+                from .character_roster import (
+                    build_profiles_from_characters,
+                    build_entity_nodes_from_characters,
                 )
-            
-            if filtered.filtered_count == 0:
-                state.status = SimulationStatus.FAILED
-                state.error = "没有找到符合条件的实体，请检查图谱是否正确构建"
-                self._save_simulation_state(state)
-                return state
-            
-            # ========== 阶段2: 生成Agent Profile ==========
-            total_entities = len(filtered.entities)
-            
-            if progress_callback:
-                progress_callback(
-                    "generating_profiles", 0,
-                    t('progress.startGenerating'),
-                    current=0,
-                    total=total_entities
-                )
-            
-            # 传入graph_id以启用Zep检索功能，获取更丰富的上下文
-            generator = OasisProfileGenerator(graph_id=state.graph_id)
-            
-            def profile_progress(current, total, msg):
+
+                if progress_callback:
+                    progress_callback("reading", 30, t('progress.readingNodeData'))
+
+                characters = []
+                for cid in character_ids:
+                    c = CharacterManager.get_character(cid)
+                    if c:
+                        characters.append(c)
+
+                if not characters:
+                    state.status = SimulationStatus.FAILED
+                    state.error = "未找到选定的角色，请检查用户库"
+                    self._save_simulation_state(state)
+                    return state
+
+                entities_for_config = build_entity_nodes_from_characters(characters)
+                state.character_ids = [c.get("character_id") for c in characters]
+                state.entities_count = len(characters)
+                state.entity_types = sorted({
+                    e.get_entity_type() or "Entity" for e in entities_for_config
+                })
+
                 if progress_callback:
                     progress_callback(
-                        "generating_profiles", 
-                        int(current / total * 100), 
-                        msg,
-                        current=current,
-                        total=total,
-                        item_name=msg
+                        "reading", 100,
+                        t('progress.readingComplete', count=len(characters)),
+                        current=len(characters), total=len(characters)
                     )
-            
-            # 设置实时保存的文件路径（优先使用 Reddit JSON 格式）
-            realtime_output_path = None
-            realtime_platform = "reddit"
-            if state.enable_reddit:
-                realtime_output_path = os.path.join(sim_dir, "reddit_profiles.json")
+                    progress_callback(
+                        "generating_profiles", 0,
+                        t('progress.startGenerating'),
+                        current=0, total=len(characters)
+                    )
+
+                profiles = build_profiles_from_characters(characters)
+                state.profiles_count = len(profiles)
+
+                # 名单模式不触发任何生成/Zep 调用，OasisProfileGenerator 仅用于写文件
+                generator = OasisProfileGenerator(graph_id=state.graph_id)
+                if state.enable_reddit:
+                    generator.save_profiles(
+                        profiles=profiles,
+                        file_path=os.path.join(sim_dir, "reddit_profiles.json"),
+                        platform="reddit"
+                    )
+                if state.enable_twitter:
+                    generator.save_profiles(
+                        profiles=profiles,
+                        file_path=os.path.join(sim_dir, "twitter_profiles.csv"),
+                        platform="twitter"
+                    )
+
+                if progress_callback:
+                    progress_callback(
+                        "generating_profiles", 100,
+                        t('progress.profilesComplete', count=len(profiles)),
+                        current=len(profiles), total=len(profiles)
+                    )
+            else:
+                # ---------- 种子抽取模式（原有逻辑） ----------
+                if progress_callback:
+                    progress_callback("reading", 0, t('progress.connectingZepGraph'))
+
+                reader = ZepEntityReader()
+
+                if progress_callback:
+                    progress_callback("reading", 30, t('progress.readingNodeData'))
+
+                filtered = reader.filter_defined_entities(
+                    graph_id=state.graph_id,
+                    defined_entity_types=defined_entity_types,
+                    enrich_with_edges=True
+                )
+
+                state.entities_count = filtered.filtered_count
+                state.entity_types = list(filtered.entity_types)
+
+                if progress_callback:
+                    progress_callback(
+                        "reading", 100,
+                        t('progress.readingComplete', count=filtered.filtered_count),
+                        current=filtered.filtered_count,
+                        total=filtered.filtered_count
+                    )
+
+                if filtered.filtered_count == 0:
+                    state.status = SimulationStatus.FAILED
+                    state.error = "没有找到符合条件的实体，请检查图谱是否正确构建"
+                    self._save_simulation_state(state)
+                    return state
+
+                entities_for_config = filtered.entities
+                total_entities = len(filtered.entities)
+
+                if progress_callback:
+                    progress_callback(
+                        "generating_profiles", 0,
+                        t('progress.startGenerating'),
+                        current=0,
+                        total=total_entities
+                    )
+
+                # 传入graph_id以启用Zep检索功能，获取更丰富的上下文
+                generator = OasisProfileGenerator(graph_id=state.graph_id)
+
+                def profile_progress(current, total, msg):
+                    if progress_callback:
+                        progress_callback(
+                            "generating_profiles",
+                            int(current / total * 100),
+                            msg,
+                            current=current,
+                            total=total,
+                            item_name=msg
+                        )
+
+                # 设置实时保存的文件路径（优先使用 Reddit JSON 格式）
+                realtime_output_path = None
                 realtime_platform = "reddit"
-            elif state.enable_twitter:
-                realtime_output_path = os.path.join(sim_dir, "twitter_profiles.csv")
-                realtime_platform = "twitter"
-            
-            profiles = generator.generate_profiles_from_entities(
-                entities=filtered.entities,
-                use_llm=use_llm_for_profiles,
-                progress_callback=profile_progress,
-                graph_id=state.graph_id,  # 传入graph_id用于Zep检索
-                parallel_count=parallel_profile_count,  # 并行生成数量
-                realtime_output_path=realtime_output_path,  # 实时保存路径
-                output_platform=realtime_platform  # 输出格式
-            )
-            
-            state.profiles_count = len(profiles)
-            
-            # 保存Profile文件（注意：Twitter使用CSV格式，Reddit使用JSON格式）
-            # Reddit 已经在生成过程中实时保存了，这里再保存一次确保完整性
-            if progress_callback:
-                progress_callback(
-                    "generating_profiles", 95,
-                    t('progress.savingProfiles'),
-                    current=total_entities,
-                    total=total_entities
+                if state.enable_reddit:
+                    realtime_output_path = os.path.join(sim_dir, "reddit_profiles.json")
+                    realtime_platform = "reddit"
+                elif state.enable_twitter:
+                    realtime_output_path = os.path.join(sim_dir, "twitter_profiles.csv")
+                    realtime_platform = "twitter"
+
+                profiles = generator.generate_profiles_from_entities(
+                    entities=filtered.entities,
+                    use_llm=use_llm_for_profiles,
+                    progress_callback=profile_progress,
+                    graph_id=state.graph_id,  # 传入graph_id用于Zep检索
+                    parallel_count=parallel_profile_count,  # 并行生成数量
+                    realtime_output_path=realtime_output_path,  # 实时保存路径
+                    output_platform=realtime_platform  # 输出格式
                 )
-            
-            if state.enable_reddit:
-                generator.save_profiles(
-                    profiles=profiles,
-                    file_path=os.path.join(sim_dir, "reddit_profiles.json"),
-                    platform="reddit"
-                )
-            
-            if state.enable_twitter:
-                # Twitter使用CSV格式！这是OASIS的要求
-                generator.save_profiles(
-                    profiles=profiles,
-                    file_path=os.path.join(sim_dir, "twitter_profiles.csv"),
-                    platform="twitter"
-                )
-            
-            if progress_callback:
-                progress_callback(
-                    "generating_profiles", 100,
-                    t('progress.profilesComplete', count=len(profiles)),
-                    current=len(profiles),
-                    total=len(profiles)
-                )
+
+                state.profiles_count = len(profiles)
+
+                # 保存Profile文件（注意：Twitter使用CSV格式，Reddit使用JSON格式）
+                # Reddit 已经在生成过程中实时保存了，这里再保存一次确保完整性
+                if progress_callback:
+                    progress_callback(
+                        "generating_profiles", 95,
+                        t('progress.savingProfiles'),
+                        current=total_entities,
+                        total=total_entities
+                    )
+
+                if state.enable_reddit:
+                    generator.save_profiles(
+                        profiles=profiles,
+                        file_path=os.path.join(sim_dir, "reddit_profiles.json"),
+                        platform="reddit"
+                    )
+
+                if state.enable_twitter:
+                    # Twitter使用CSV格式！这是OASIS的要求
+                    generator.save_profiles(
+                        profiles=profiles,
+                        file_path=os.path.join(sim_dir, "twitter_profiles.csv"),
+                        platform="twitter"
+                    )
+
+                if progress_callback:
+                    progress_callback(
+                        "generating_profiles", 100,
+                        t('progress.profilesComplete', count=len(profiles)),
+                        current=len(profiles),
+                        total=len(profiles)
+                    )
             
             # ========== 阶段3: LLM智能生成模拟配置 ==========
             if progress_callback:
@@ -406,7 +483,7 @@ class SimulationManager:
                 graph_id=state.graph_id,
                 simulation_requirement=simulation_requirement,
                 document_text=document_text,
-                entities=filtered.entities,
+                entities=entities_for_config,
                 enable_twitter=state.enable_twitter,
                 enable_reddit=state.enable_reddit
             )

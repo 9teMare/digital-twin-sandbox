@@ -5,6 +5,7 @@
       <div class="nav-brand">DIGITAL TWIN AGENT SANDBOX</div>
       <div class="nav-links">
         <LanguageSwitcher />
+        <router-link to="/characters" class="nav-link-btn">{{ $t('characters.navLink') }}</router-link>
         <a href="https://github.com/666ghj/MiroFish" target="_blank" class="github-link">
           {{ $t('nav.visitGithub') }} <span class="arrow">↗</span>
         </a>
@@ -374,6 +375,23 @@ const startSimulation = () => {
 
 .github-link:hover {
   opacity: 0.8;
+}
+
+.nav-link-btn {
+  color: var(--white);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.nav-link-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.6);
 }
 
 .arrow {

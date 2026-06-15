@@ -1,6 +1,45 @@
 <template>
   <div class="env-setup-panel">
     <div class="scroll-container">
+      <!-- Step 00: 选择参与本次模拟的角色（名单模式） -->
+      <div v-if="librarySelecting" class="step-card active roster-card">
+        <div class="card-header">
+          <div class="step-info">
+            <span class="step-num">00</span>
+            <span class="step-title">{{ $t('characters.rosterStepTitle') }}</span>
+          </div>
+          <a class="roster-manage" href="/characters" target="_blank" rel="noopener">{{ $t('characters.navLink') }} ↗</a>
+        </div>
+        <div class="card-content">
+          <p class="description">{{ $t('characters.rosterStepDesc') }}</p>
+          <div class="roster-toolbar">
+            <input v-model="rosterQuery" class="roster-search" :placeholder="$t('characters.searchPlaceholder')" />
+            <button class="roster-btn" @click="selectAllRoster">{{ $t('characters.rosterSelectAll') }}</button>
+            <button class="roster-btn" @click="clearRoster">{{ $t('characters.rosterClear') }}</button>
+          </div>
+          <div class="roster-list">
+            <label
+              v-for="c in filteredLibrary"
+              :key="c.character_id"
+              class="roster-item"
+              :class="{ sel: selectedCharacterIds.includes(c.character_id) }"
+            >
+              <input type="checkbox" :value="c.character_id" v-model="selectedCharacterIds" />
+              <span class="roster-name">{{ c.name }}</span>
+              <span class="roster-meta">{{ c.occupation || '—' }}</span>
+              <span v-if="c.risk_type" class="roster-chip">{{ c.risk_type }}</span>
+              <span class="roster-assets">{{ (c.preferred_assets || []).slice(0, 3).join(', ') }}</span>
+            </label>
+          </div>
+          <div class="roster-actions">
+            <button class="roster-secondary" @click="useAutoSeed">{{ $t('characters.rosterAuto') }}</button>
+            <button class="roster-primary" :disabled="selectedCharacterIds.length === 0" @click="confirmRoster">
+              {{ $t('characters.rosterUseSelected', { n: selectedCharacterIds.length }) }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Step 01: 模拟实例 -->
       <div class="step-card" :class="{ 'active': phase === 0, 'completed': phase > 0 }">
         <div class="card-header">
@@ -641,6 +680,7 @@ import {
   getSimulationConfig,
   getSimulationConfigRealtime
 } from '../api/simulation'
+import { listCharacters } from '../api/character'
 
 const { t } = useI18n()
 
@@ -656,6 +696,12 @@ const emit = defineEmits(['go-back', 'next-step', 'add-log', 'update-status'])
 // State
 const phase = ref(0) // 0: 初始化, 1: 生成人设, 2: 生成配置, 3: 完成
 const taskId = ref(null)
+
+// 角色名单选择（名单模式）
+const librarySelecting = ref(false)
+const libraryCharacters = ref([])
+const selectedCharacterIds = ref([])
+const rosterQuery = ref('')
 const prepareProgress = ref(0)
 const currentStage = ref('')
 const progressMessage = ref('')
@@ -769,25 +815,35 @@ const selectProfile = (profile) => {
 }
 
 // 自动开始准备模拟
-const startPrepareSimulation = async () => {
+// characterIds 非空 -> 名单模式（使用用户库选定角色）；否则 -> 种子抽取模式
+const startPrepareSimulation = async (characterIds = null) => {
   if (!props.simulationId) {
     addLog(t('log.errorMissingSimId'))
     emit('update-status', 'error')
     return
   }
-  
+
+  librarySelecting.value = false
+
   // 标记第一步完成，开始第二步
   phase.value = 1
   addLog(t('log.simInstanceCreated', { id: props.simulationId }))
   addLog(t('log.preparingSimEnv'))
+  if (characterIds && characterIds.length) {
+    addLog(t('characters.rosterSelectedLog', { n: characterIds.length }))
+  }
   emit('update-status', 'processing')
   
   try {
-    const res = await prepareSimulation({
+    const payload = {
       simulation_id: props.simulationId,
       use_llm_for_profiles: true,
       parallel_profile_count: 5
-    })
+    }
+    if (characterIds && characterIds.length) {
+      payload.character_ids = characterIds
+    }
+    const res = await prepareSimulation(payload)
     
     if (res.success && res.data) {
       if (res.data.already_prepared) {
@@ -1068,12 +1124,58 @@ watch(() => props.systemLogs?.length, () => {
   })
 })
 
-onMounted(() => {
-  // 自动开始准备流程
-  if (props.simulationId) {
-    addLog(t('log.step2Init'))
+// 名单选择面板：搜索过滤
+const filteredLibrary = computed(() => {
+  const q = rosterQuery.value.trim().toLowerCase()
+  if (!q) return libraryCharacters.value
+  return libraryCharacters.value.filter(c =>
+    `${c.name || ''} ${c.occupation || ''} ${c.risk_type || ''} ${(c.preferred_assets || []).join(' ')}`
+      .toLowerCase().includes(q)
+  )
+})
+
+const selectAllRoster = () => {
+  selectedCharacterIds.value = filteredLibrary.value.map(c => c.character_id)
+}
+const clearRoster = () => { selectedCharacterIds.value = [] }
+const confirmRoster = () => { startPrepareSimulation([...selectedCharacterIds.value]) }
+const useAutoSeed = () => { startPrepareSimulation(null) }
+
+// 初始化：若已准备完成则直接加载；否则按用户库决定是否展示名单选择
+const initStep2 = async () => {
+  if (!props.simulationId) return
+  addLog(t('log.step2Init'))
+
+  // 1) 已准备完成 -> 直接复用（startPrepareSimulation 内部会识别 already_prepared）
+  try {
+    const st = await getPrepareStatus({ simulation_id: props.simulationId })
+    if (st.success && st.data && st.data.already_prepared) {
+      startPrepareSimulation()
+      return
+    }
+  } catch (e) {
+    // 忽略，继续后续流程
+  }
+
+  // 2) 加载用户库，决定是否展示名单选择面板
+  try {
+    const res = await listCharacters({ enabled: true, limit: 500 })
+    libraryCharacters.value = (res.data && res.data.characters) || []
+  } catch (e) {
+    libraryCharacters.value = []
+  }
+
+  if (libraryCharacters.value.length > 0) {
+    // 有用户库 -> 让用户挑选本次模拟的参与者
+    librarySelecting.value = true
+  } else {
+    // 无用户库 -> 回退到种子抽取
     startPrepareSimulation()
   }
+}
+
+onMounted(() => {
+  initStep2()
 })
 
 onUnmounted(() => {
@@ -1100,6 +1202,89 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 20px;
 }
+
+/* 角色名单选择 */
+.roster-card .roster-manage {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #FF5722;
+  text-decoration: none;
+}
+.roster-toolbar {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+.roster-search {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #E0E0E0;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.roster-btn {
+  padding: 8px 12px;
+  border: 1px solid #E0E0E0;
+  background: #FFF;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.roster-btn:hover { background: #F5F5F5; }
+.roster-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #EEE;
+  border-radius: 8px;
+}
+.roster-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #F2F2F2;
+  cursor: pointer;
+  font-size: 13px;
+}
+.roster-item:last-child { border-bottom: none; }
+.roster-item:hover { background: #FAFAFA; }
+.roster-item.sel { background: #FFF4F0; }
+.roster-name { font-weight: 600; min-width: 120px; }
+.roster-meta { color: #777; flex: 1; }
+.roster-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  background: #F0F0F0;
+  color: #555;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.roster-assets { color: #999; font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+.roster-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+.roster-secondary {
+  padding: 9px 16px;
+  border: 1px solid #E0E0E0;
+  background: #FFF;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.roster-secondary:hover { background: #F5F5F5; }
+.roster-primary {
+  padding: 9px 18px;
+  border: none;
+  background: #FF5722;
+  color: #FFF;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.roster-primary:disabled { background: #FFB59E; cursor: not-allowed; }
 
 /* Step Card */
 .step-card {

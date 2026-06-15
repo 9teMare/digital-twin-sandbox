@@ -467,25 +467,34 @@ def prepare_simulation():
         entity_types_list = data.get('entity_types')
         use_llm_for_profiles = data.get('use_llm_for_profiles', True)
         parallel_profile_count = data.get('parallel_profile_count', 5)
-        
-        # ========== 同步获取实体数量（在后台任务启动前） ==========
+        # 角色名单模式：用户从"用户库"挑选的角色 ID（为空则走种子抽取）
+        character_ids = data.get('character_ids') or None
+
+        # ========== 同步获取预期 Agent 数量（在后台任务启动前） ==========
         # 这样前端在调用prepare后立即就能获取到预期Agent总数
-        try:
-            logger.info(f"同步获取实体数量: graph_id={state.graph_id}")
-            reader = ZepEntityReader()
-            # 快速读取实体（不需要边信息，只统计数量）
-            filtered_preview = reader.filter_defined_entities(
-                graph_id=state.graph_id,
-                defined_entity_types=entity_types_list,
-                enrich_with_edges=False  # 不获取边信息，加快速度
-            )
-            # 保存实体数量到状态（供前端立即获取）
-            state.entities_count = filtered_preview.filtered_count
-            state.entity_types = list(filtered_preview.entity_types)
-            logger.info(f"预期实体数量: {filtered_preview.filtered_count}, 类型: {filtered_preview.entity_types}")
-        except Exception as e:
-            logger.warning(f"同步获取实体数量失败（将在后台任务中重试）: {e}")
-            # 失败不影响后续流程，后台任务会重新获取
+        if character_ids:
+            # 名单模式：数量即为选定角色数，无需访问 Zep
+            state.entities_count = len(character_ids)
+            state.entity_types = ['CryptoUser']
+            state.character_ids = list(character_ids)
+            logger.info(f"名单模式: 选定 {len(character_ids)} 个角色")
+        else:
+            try:
+                logger.info(f"同步获取实体数量: graph_id={state.graph_id}")
+                reader = ZepEntityReader()
+                # 快速读取实体（不需要边信息，只统计数量）
+                filtered_preview = reader.filter_defined_entities(
+                    graph_id=state.graph_id,
+                    defined_entity_types=entity_types_list,
+                    enrich_with_edges=False  # 不获取边信息，加快速度
+                )
+                # 保存实体数量到状态（供前端立即获取）
+                state.entities_count = filtered_preview.filtered_count
+                state.entity_types = list(filtered_preview.entity_types)
+                logger.info(f"预期实体数量: {filtered_preview.filtered_count}, 类型: {filtered_preview.entity_types}")
+            except Exception as e:
+                logger.warning(f"同步获取实体数量失败（将在后台任务中重试）: {e}")
+                # 失败不影响后续流程，后台任务会重新获取
         
         # 创建异步任务
         task_manager = TaskManager()
@@ -587,7 +596,8 @@ def prepare_simulation():
                     defined_entity_types=entity_types_list,
                     use_llm_for_profiles=use_llm_for_profiles,
                     progress_callback=progress_callback,
-                    parallel_profile_count=parallel_profile_count
+                    parallel_profile_count=parallel_profile_count,
+                    character_ids=character_ids
                 )
                 
                 # 任务完成
