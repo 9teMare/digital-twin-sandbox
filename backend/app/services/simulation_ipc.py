@@ -19,7 +19,7 @@ from enum import Enum
 
 from ..utils.logger import get_logger
 
-logger = get_logger('mirofish.simulation_ipc')
+logger = get_logger('digital_twin_agent_sandbox.simulation_ipc')
 
 
 class CommandType(str, Enum):
