@@ -44,9 +44,29 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app/backend
 
-# Install Python deps first (cached on the lockfile)
+# Install Python deps. NOTE: the install and the slim-down MUST happen in the
+# same RUN layer — Docker layers are additive, so deleting files in a later
+# layer would not shrink the image.
+#
+# The default PyPI `torch` (pinned in uv.lock) bundles multi-GB NVIDIA CUDA
+# libraries that this app never uses (all model inference happens via remote
+# LLM/Zep APIs). After syncing, we swap torch for the CPU-only build and purge
+# the now-orphaned NVIDIA/Triton packages, keeping the image under Fly's 8GB.
 COPY backend/pyproject.toml backend/uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN set -eux; \
+    uv sync --frozen --no-dev --no-cache; \
+    VENV=/app/backend/.venv; \
+    PY="$VENV/bin/python"; \
+    TORCH_VER="$($PY -c 'import torch; print(torch.__version__.split("+")[0])' 2>/dev/null || true)"; \
+    ORPHANS="$(uv pip freeze --python "$PY" | grep -iE '^(nvidia-|triton)' | cut -d'=' -f1 || true)"; \
+    if [ -n "$TORCH_VER" ]; then uv pip uninstall --python "$PY" torch; fi; \
+    if [ -n "$ORPHANS" ]; then uv pip uninstall --python "$PY" $ORPHANS; fi; \
+    if [ -n "$TORCH_VER" ]; then \
+      uv pip install --python "$PY" --no-cache "torch==$TORCH_VER" --index-url https://download.pytorch.org/whl/cpu \
+      || uv pip install --python "$PY" --no-cache torch --index-url https://download.pytorch.org/whl/cpu; \
+      "$PY" -c "import torch; print('torch', torch.__version__)"; \
+    fi; \
+    rm -rf /root/.cache
 
 # Backend source + shared locales
 COPY backend/ ./
