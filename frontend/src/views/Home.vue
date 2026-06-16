@@ -17,7 +17,7 @@
         <ThemeSwitcher />
         <LanguageSwitcher />
         <router-link to="/characters" class="nav-link-btn">{{ $t('characters.navLink') }}</router-link>
-        <a href="https://github.com/666ghj/MiroFish" target="_blank" class="github-link">
+        <a href="https://github.com/9teMare/digital-twin-sandbox" target="_blank" class="github-link">
           {{ $t('nav.visitGithub') }} <span class="arrow">↗</span>
         </a>
       </div>
