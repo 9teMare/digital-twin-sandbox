@@ -1103,7 +1103,7 @@ onUnmounted(() => {
 
 .process-page {
   min-height: 100vh;
-  background: var(--white);
+  background: var(--bg);
   font-family: 'JetBrains Mono', 'Noto Sans SC', monospace;
   overflow: hidden; /* Prevent body scroll in fullscreen */
 }
@@ -1207,9 +1207,9 @@ onUnmounted(() => {
   flex: none; /* Fixed width initially */
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #E0E0E0;
+  border-right: 1px solid var(--border);
   transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  background: #fff;
+  background: var(--surface);
   z-index: 5;
 }
 
@@ -1223,8 +1223,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
-  border-bottom: 1px solid #E0E0E0;
-  background: #fff;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
   height: 50px;
 }
 
@@ -1250,7 +1250,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 16px;
   font-size: 0.75rem;
-  color: #666;
+  color: var(--text-muted);
 }
 
 .stat-item {
@@ -1261,11 +1261,11 @@ onUnmounted(() => {
 
 .stat-val {
   font-weight: 600;
-  color: #333;
+  color: var(--text-body);
 }
 
 .stat-divider {
-  color: #eee;
+  color: var(--border);
 }
 
 .action-buttons {
@@ -1284,13 +1284,13 @@ onUnmounted(() => {
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.2s;
-  color: #666;
+  color: var(--text-muted);
   border-radius: 2px;
 }
 
 .action-btn:hover:not(:disabled) {
-  background: #F5F5F5;
-  color: #000;
+  background: var(--bg-muted);
+  color: var(--text-strong);
 }
 
 .action-btn:disabled {
@@ -1373,13 +1373,13 @@ onUnmounted(() => {
 .loading-text,
 .waiting-text {
   font-size: 0.9rem;
-  color: #333;
+  color: var(--text-body);
   margin: 0 0 8px;
 }
 
 .waiting-hint {
   font-size: 0.8rem;
-  color: #999;
+  color: var(--text-faint);
   margin: 0;
 }
 
@@ -1434,8 +1434,8 @@ onUnmounted(() => {
   right: 16px;
   width: 320px;
   max-height: calc(100% - 32px);
-  background: #fff;
-  border: 1px solid #E0E0E0;
+  background: var(--elevated);
+  border: 1px solid var(--border);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   display: flex;
@@ -1448,14 +1448,14 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: #FAFAFA;
-  border-bottom: 1px solid #E0E0E0;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
 }
 
 .detail-title {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #333;
+  color: var(--text-body);
 }
 
 .detail-badge {
@@ -1475,13 +1475,13 @@ onUnmounted(() => {
   background: none;
   border: none;
   font-size: 1.2rem;
-  color: #999;
+  color: var(--text-faint);
   cursor: pointer;
   transition: color 0.2s;
 }
 
 .detail-close:hover {
-  color: #333;
+  color: var(--text-body);
 }
 
 .detail-content {
@@ -1498,21 +1498,21 @@ onUnmounted(() => {
 
 .detail-label {
   font-size: 0.8rem;
-  color: #999;
+  color: var(--text-faint);
   min-width: 70px;
   flex-shrink: 0;
 }
 
 .detail-value {
   font-size: 0.85rem;
-  color: #333;
+  color: var(--text-body);
   word-break: break-word;
 }
 
 .detail-value.uuid {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem;
-  color: #666;
+  color: var(--text-muted);
 }
 
 .detail-section {
@@ -1522,10 +1522,10 @@ onUnmounted(() => {
 .detail-summary {
   margin: 8px 0 0 0;
   font-size: 0.85rem;
-  color: #333;
+  color: var(--text-body);
   line-height: 1.6;
   padding: 10px;
-  background: #F9F9F9;
+  background: var(--bg-subtle);
   border-left: 3px solid #FF6B35;
 }
 
@@ -1538,9 +1538,9 @@ onUnmounted(() => {
 .label-tag {
   padding: 2px 8px;
   font-size: 0.75rem;
-  background: #F0F0F0;
-  border: 1px solid #E0E0E0;
-  color: #666;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
 }
 
 /* 边详情关系展示 */
@@ -1551,19 +1551,19 @@ onUnmounted(() => {
   gap: 8px;
   margin-bottom: 16px;
   padding: 12px;
-  background: #F9F9F9;
-  border: 1px solid #E0E0E0;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
 }
 
 .edge-source,
 .edge-target {
   font-size: 0.85rem;
   font-weight: 500;
-  color: #333;
+  color: var(--text-body);
 }
 
 .edge-arrow {
-  color: #999;
+  color: var(--text-faint);
 }
 
 .edge-type {
@@ -1575,24 +1575,24 @@ onUnmounted(() => {
 
 .detail-value.highlight {
   font-weight: 600;
-  color: #000;
+  color: var(--text-strong);
 }
 
 .detail-subtitle {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #333;
+  color: var(--text-body);
   margin: 16px 0 12px 0;
   padding-bottom: 8px;
-  border-bottom: 1px solid #E0E0E0;
+  border-bottom: 1px solid var(--border);
 }
 
 /* Properties 属性列表 */
 .properties-list {
   margin-top: 8px;
   padding: 10px;
-  background: #F9F9F9;
-  border: 1px solid #E0E0E0;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
 }
 
 .property-item {
@@ -1606,13 +1606,13 @@ onUnmounted(() => {
 }
 
 .property-key {
-  color: #666;
+  color: var(--text-muted);
   margin-right: 8px;
   font-family: 'JetBrains Mono', monospace;
 }
 
 .property-value {
-  color: #333;
+  color: var(--text-body);
   word-break: break-word;
 }
 
@@ -1629,9 +1629,9 @@ onUnmounted(() => {
   padding: 6px 10px;
   font-size: 0.75rem;
   font-family: 'JetBrains Mono', monospace;
-  background: #F0F0F0;
-  border: 1px solid #E0E0E0;
-  color: #666;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
   word-break: break-all;
 }
 
@@ -1647,8 +1647,8 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 16px;
   padding: 12px 24px;
-  border-top: 1px solid #E0E0E0;
-  background: #FAFAFA;
+  border-top: 1px solid var(--border);
+  background: var(--bg-subtle);
 }
 
 .legend-item {
@@ -1665,11 +1665,11 @@ onUnmounted(() => {
 }
 
 .legend-label {
-  color: #333;
+  color: var(--text-body);
 }
 
 .legend-count {
-  color: #999;
+  color: var(--text-faint);
 }
 
 /* 右侧面板 - 50% default */
@@ -1678,7 +1678,7 @@ onUnmounted(() => {
   flex: none;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--surface);
   transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, transform 0.3s ease;
   overflow: hidden;
   opacity: 1;
@@ -1712,7 +1712,7 @@ onUnmounted(() => {
 /* 流程阶段 */
 .process-phase {
   margin-bottom: 24px;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--border);
   opacity: 0.5;
   transition: all 0.3s;
 }
@@ -1735,8 +1735,8 @@ onUnmounted(() => {
   align-items: flex-start;
   gap: 16px;
   padding: 16px;
-  background: #FAFAFA;
-  border-bottom: 1px solid #E0E0E0;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
 }
 
 .process-phase.active .phase-header {
@@ -1774,15 +1774,15 @@ onUnmounted(() => {
 
 .phase-api {
   font-size: 0.75rem;
-  color: #999;
+  color: var(--text-faint);
   font-family: 'JetBrains Mono', monospace;
 }
 
 .phase-status {
   font-size: 0.75rem;
   padding: 4px 10px;
-  background: #eee;
-  color: #666;
+  background: var(--bg-muted);
+  color: var(--text-muted);
 }
 
 .phase-status.active {
@@ -1810,9 +1810,9 @@ onUnmounted(() => {
 .entity-tag {
   font-size: 0.75rem;
   padding: 4px 10px;
-  background: #F5F5F5;
-  border: 1px solid #E0E0E0;
-  color: #333;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  color: var(--text-body);
 }
 
 /* 关系列表 */
@@ -1825,7 +1825,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px dashed #eee;
+  border-bottom: 1px dashed var(--border);
 }
 
 .relation-item:last-child {
@@ -1834,7 +1834,7 @@ onUnmounted(() => {
 
 .rel-source,
 .rel-target {
-  color: #333;
+  color: var(--text-body);
 }
 
 .rel-arrow {
@@ -1848,7 +1848,7 @@ onUnmounted(() => {
 
 .relation-more {
   padding-top: 8px;
-  color: #999;
+  color: var(--text-faint);
   font-size: 0.75rem;
 }
 
@@ -1873,26 +1873,26 @@ onUnmounted(() => {
 
 .progress-text {
   font-size: 0.85rem;
-  color: #333;
+  color: var(--text-body);
 }
 
 /* 等待状态 */
 .waiting-state {
   padding: 16px;
-  background: #F9F9F9;
-  border: 1px dashed #E0E0E0;
+  background: var(--bg-subtle);
+  border: 1px dashed var(--border);
   text-align: center;
 }
 
 .waiting-hint {
   font-size: 0.85rem;
-  color: #999;
+  color: var(--text-faint);
 }
 
 /* 进度条 */
 .progress-bar {
   height: 6px;
-  background: #E0E0E0;
+  background: var(--border);
   margin-bottom: 8px;
   overflow: hidden;
 }
@@ -1910,7 +1910,7 @@ onUnmounted(() => {
 }
 
 .progress-message {
-  color: #666;
+  color: var(--text-muted);
 }
 
 .progress-percent {
@@ -1928,20 +1928,20 @@ onUnmounted(() => {
   flex: 1;
   text-align: center;
   padding: 12px;
-  background: #F5F5F5;
+  background: var(--bg-muted);
 }
 
 .result-value {
   display: block;
   font-size: 1.5rem;
   font-weight: 700;
-  color: #000;
+  color: var(--text-strong);
   margin-bottom: 4px;
 }
 
 .result-label {
   font-size: 0.7rem;
-  color: #999;
+  color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -1950,7 +1950,7 @@ onUnmounted(() => {
 .next-step-section {
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid #E0E0E0;
+  border-top: 1px solid var(--border);
 }
 
 .next-step-btn {
@@ -1985,8 +1985,8 @@ onUnmounted(() => {
 
 /* 项目信息面板 */
 .project-panel {
-  border-top: 1px solid #E0E0E0;
-  background: #FAFAFA;
+  border-top: 1px solid var(--border);
+  background: var(--bg-subtle);
 }
 
 .project-header {
@@ -1994,7 +1994,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   padding: 12px 24px;
-  border-bottom: 1px solid #E0E0E0;
+  border-bottom: 1px solid var(--border);
 }
 
 .project-icon {
@@ -2015,7 +2015,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: flex-start;
   padding: 8px 0;
-  border-bottom: 1px dashed #E0E0E0;
+  border-bottom: 1px dashed var(--border);
   font-size: 0.8rem;
 }
 
@@ -2024,12 +2024,12 @@ onUnmounted(() => {
 }
 
 .item-label {
-  color: #999;
+  color: var(--text-faint);
   flex-shrink: 0;
 }
 
 .item-value {
-  color: #333;
+  color: var(--text-body);
   text-align: right;
   max-width: 60%;
   word-break: break-all;
@@ -2038,7 +2038,7 @@ onUnmounted(() => {
 .item-value.code {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem;
-  color: #666;
+  color: var(--text-muted);
 }
 
 /* 响应式 */
@@ -2050,7 +2050,7 @@ onUnmounted(() => {
   .left-panel {
     width: 100% !important;
     border-right: none;
-    border-bottom: 1px solid #E0E0E0;
+    border-bottom: 1px solid var(--border);
     height: 50vh;
   }
   

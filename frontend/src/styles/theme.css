@@ -1,0 +1,156 @@
+/*
+  Global theme tokens — light & dark.
+  Light values intentionally match the app's original appearance so light mode
+  is visually unchanged. Dark mode overrides the same semantic tokens.
+
+  Accent / semantic brand colors (orange, violet, success, etc.) are tuned per
+  theme but kept close so component code can reference them directly.
+*/
+
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  /* page + surfaces */
+  --bg: #ffffff;
+  --bg-subtle: #fafafa;
+  --bg-muted: #f5f5f5;
+  --surface: #ffffff;
+  --surface-2: #f9fafb;
+  --surface-3: #f3f4f6;
+  --elevated: #ffffff;
+
+  /* borders */
+  --border: #e5e7eb;
+  --border-subtle: #f3f4f6;
+  --border-strong: #d1d5db;
+
+  /* text */
+  --text: #111827;
+  --text-strong: #000000;
+  --text-body: #333333;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+  --text-inverse: #ffffff;
+
+  /* brand / semantic */
+  --accent: #ff5722;
+  --accent-strong: #ea580c;
+  --accent-soft: rgba(255, 87, 34, 0.10);
+  --accent-2: #6d5bff;
+  --accent-2-soft: rgba(109, 91, 255, 0.12);
+  --success: #10b981;
+  --success-soft: rgba(16, 185, 129, 0.12);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.12);
+  --danger: #f44336;
+  --danger-soft: rgba(244, 67, 54, 0.12);
+  --info: #3498db;
+  --info-soft: rgba(52, 152, 219, 0.12);
+
+  /* effects */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --overlay: rgba(0, 0, 0, 0.4);
+  --grid-line: rgba(0, 0, 0, 0.05);
+  --code-bg: #f5f5f5;
+  --input-bg: #fafafa;
+  --glow: rgba(109, 91, 255, 0.2);
+
+  /* navbar (translucent / glassmorphism) */
+  --nav-bg: rgba(255, 255, 255, 0.72);
+
+  /* decorative (used by Cubes / hero) */
+  --cube-face: #ececf6;
+  --cube-border: rgba(109, 91, 255, 0.35);
+  --scrollbar-track: #f1f1f1;
+  --scrollbar-thumb: #cfcfd8;
+  --scrollbar-thumb-hover: #6d5bff;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* page + surfaces */
+  --bg: #06070d;
+  --bg-subtle: #0b0d16;
+  --bg-muted: #0d0e18;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --surface-3: rgba(255, 255, 255, 0.09);
+  --elevated: #11121d;
+
+  /* borders */
+  --border: rgba(255, 255, 255, 0.10);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  /* text */
+  --text: #ececf6;
+  --text-strong: #f3f3fb;
+  --text-body: #c8c8da;
+  --text-muted: #8a8aa6;
+  --text-faint: #5d5d78;
+  --text-inverse: #06070d;
+
+  /* brand / semantic */
+  --accent: #ff5a2c;
+  --accent-strong: #ff8a3c;
+  --accent-soft: rgba(255, 90, 44, 0.14);
+  --accent-2: #6d5bff;
+  --accent-2-soft: rgba(109, 91, 255, 0.16);
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.14);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.14);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --info: #60a5fa;
+  --info-soft: rgba(96, 165, 250, 0.14);
+
+  /* effects */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 30px 60px -15px rgba(0, 0, 0, 0.8);
+  --overlay: rgba(0, 0, 0, 0.65);
+  --grid-line: rgba(255, 255, 255, 0.04);
+  --code-bg: rgba(255, 255, 255, 0.05);
+  --input-bg: rgba(0, 0, 0, 0.25);
+  --glow: rgba(109, 91, 255, 0.4);
+
+  /* navbar (translucent / glassmorphism) */
+  --nav-bg: rgba(8, 9, 16, 0.6);
+
+  /* decorative */
+  --cube-face: #0b0c16;
+  --cube-border: rgba(109, 91, 255, 0.35);
+  --scrollbar-track: #0d0e18;
+  --scrollbar-thumb: #2a2a3d;
+  --scrollbar-thumb-hover: #6d5bff;
+}
+
+html,
+body {
+  background: var(--bg);
+}
+
+body {
+  transition: background-color 0.3s ease;
+}
+
+/* Scrollbars follow the theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}

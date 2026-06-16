@@ -74,6 +74,30 @@ def create_app(config_class=Config):
     def health():
         return {'status': 'ok', 'service': 'Digital Twin Agent Sandbox Backend'}
     
+    # ---- 生产部署：同源托管已构建的前端（frontend/dist）----
+    # 仅在构建产物存在时启用（本地开发由 Vite dev server 提供前端，不受影响）
+    frontend_dist = os.environ.get(
+        'FRONTEND_DIST',
+        os.path.join(os.path.dirname(__file__), '../../frontend/dist')
+    )
+    if os.path.isdir(frontend_dist):
+        from flask import send_from_directory, abort
+
+        @app.route('/', defaults={'path': ''})
+        @app.route('/<path:path>')
+        def serve_spa(path):
+            # 不拦截后端路由（蓝图已优先匹配，这里只兜底未命中的 /api 与 /health）
+            if path.startswith('api/') or path == 'health':
+                abort(404)
+            target = os.path.join(frontend_dist, path)
+            if path and os.path.isfile(target):
+                return send_from_directory(frontend_dist, path)
+            # SPA history 模式回退到 index.html
+            return send_from_directory(frontend_dist, 'index.html')
+
+        if should_log_startup:
+            logger.info(f"已启用前端静态托管: {frontend_dist}")
+    
     if should_log_startup:
         logger.info("Digital Twin Agent Sandbox Backend 启动完成")
     

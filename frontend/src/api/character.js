@@ -65,6 +65,6 @@ export const importCharactersData = (payload) => {
  * 导出全部角色为 JSON 文件（触发浏览器下载）
  */
 export const exportCharactersUrl = () => {
-  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001'
+  const base = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001'
   return `${base}/api/characters/export`
 }

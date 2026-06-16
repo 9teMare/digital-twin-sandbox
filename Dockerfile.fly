@@ -1,0 +1,66 @@
+# syntax=docker/dockerfile:1
+#
+# Production image for Fly.io — single container that serves BOTH the built
+# Vue SPA and the Flask API on the same origin (port 8080).
+#
+#   Stage 1: build the frontend with Vite (relative API base → same origin)
+#   Stage 2: install backend deps with uv and run Flask, which also serves dist/
+
+############################
+# Stage 1 — build frontend #
+############################
+FROM node:20-slim AS frontend-build
+
+WORKDIR /app/frontend
+
+# Install deps first (better layer caching)
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+# App source + shared locales (vite alias '@locales' resolves to ../locales)
+COPY frontend/ ./
+COPY locales/ /app/locales/
+
+# Empty base URL → axios uses relative '/api/...', hitting the same origin
+ENV VITE_API_BASE_URL=""
+RUN npm run build
+
+
+#############################
+# Stage 2 — backend runtime #
+#############################
+FROM python:3.11 AS runtime
+
+# Fast, reproducible Python installs
+COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONUTF8=1 \
+    UV_PROJECT_ENVIRONMENT=/app/backend/.venv \
+    FRONTEND_DIST=/app/frontend/dist \
+    FLASK_HOST=0.0.0.0 \
+    FLASK_PORT=8080 \
+    FLASK_DEBUG=false
+
+WORKDIR /app/backend
+
+# Install Python deps first (cached on the lockfile)
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --frozen --no-dev
+
+# Backend source + shared locales
+COPY backend/ ./
+COPY locales/ /app/locales/
+
+# Built SPA from stage 1
+COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
+
+# Put the venv first on PATH so `python` (and sys.executable used to spawn
+# simulation subprocesses) resolves to the project environment.
+ENV PATH="/app/backend/.venv/bin:$PATH"
+
+WORKDIR /app
+EXPOSE 8080
+
+# Flask serves the API and the built SPA. run.py reads FLASK_HOST/PORT/DEBUG.
+CMD ["python", "backend/run.py"]

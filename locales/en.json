@@ -113,6 +113,10 @@
     "rosterAuto": "Auto-generate from seed",
     "rosterSelectedLog": "Roster mode: {n} users selected"
   },
+  "theme": {
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode"
+  },
   "meta": {
     "title": "Digital Twin Agent Sandbox - Predict Everything",
     "description": "Digital Twin Agent Sandbox - Social Media Opinion Simulation System"

@@ -113,6 +113,10 @@
     "rosterAuto": "根据种子自动生成",
     "rosterSelectedLog": "名单模式：已选择 {n} 个用户"
   },
+  "theme": {
+    "switchToLight": "切换到浅色模式",
+    "switchToDark": "切换到深色模式"
+  },
   "meta": {
     "title": "Digital Twin Agent Sandbox - 预测万物",
     "description": "Digital Twin Agent Sandbox - 社交媒体舆论模拟系统"

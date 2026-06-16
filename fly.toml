@@ -1,0 +1,49 @@
+# fly.toml — Digital Twin Agent Sandbox
+#
+# Single Fly Machine that serves the Vue SPA and the Flask API on one origin.
+# The app is STATEFUL (in-memory simulation registry + on-disk data under
+# backend/uploads), so it runs as a single always-on machine with a volume.
+#
+# Change `app` to a globally-unique name before first deploy.
+
+app = "digital-twin-agent-sandbox"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile.fly"
+
+[env]
+  FLASK_HOST = "0.0.0.0"
+  FLASK_PORT = "8080"
+  FLASK_DEBUG = "false"
+  FRONTEND_DIST = "/app/frontend/dist"
+
+# Persist uploaded seeds, generated profiles, simulation logs, characters, reports.
+[[mounts]]
+  source = "uploads"
+  destination = "/app/backend/uploads"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Keep the single machine alive — running simulations live in memory.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+  [[http_service.checks]]
+    method = "get"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "60s"
+
+# Simulations (camel-oasis + LLM calls) are CPU/RAM heavy — bump if needed.
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"
