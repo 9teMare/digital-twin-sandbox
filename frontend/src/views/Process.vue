@@ -77,6 +77,11 @@
                   <span class="detail-label">Created:</span>
                   <span class="detail-value">{{ formatDate(selectedItem.data.created_at) }}</span>
                 </div>
+
+                <div class="detail-row" v-if="selectedItem.specificType && selectedItem.specificType !== selectedItem.entityType">
+                  <span class="detail-label">Specific Type:</span>
+                  <span class="detail-value">{{ selectedItem.specificType }}</span>
+                </div>
                 
                 <!-- Properties / Attributes -->
                 <div class="detail-section" v-if="selectedItem.data.attributes && Object.keys(selectedItem.data.attributes).length > 0">
@@ -416,6 +421,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { generateOntology, getProject, buildGraph, getTaskStatus, getGraphData } from '../api/graph'
 import { getPendingUpload, clearPendingUpload } from '../store/pendingUpload'
+import { buildEntityTypeLegend, classifyGraphNode } from '../utils/graphNodeClassifier'
 import * as d3 from 'd3'
 
 const route = useRoute()
@@ -459,20 +465,7 @@ const statusText = computed(() => {
 })
 
 const entityTypes = computed(() => {
-  if (!graphData.value?.nodes) return []
-  
-  const typeMap = {}
-  const colors = ['#FF6B35', '#004E89', '#7B2D8E', '#1A936F', '#C5283D', '#E9724C']
-  
-  graphData.value.nodes.forEach(node => {
-    const type = node.labels?.find(l => l !== 'Entity') || 'Entity'
-    if (!typeMap[type]) {
-      typeMap[type] = { name: type, count: 0, color: colors[Object.keys(typeMap).length % colors.length] }
-    }
-    typeMap[type].count++
-  })
-  
-  return Object.values(typeMap)
+  return buildEntityTypeLegend(graphData.value?.nodes || [])
 })
 
 // 方法
@@ -517,11 +510,13 @@ const formatDate = (dateStr) => {
 
 // 选中节点
 const selectNode = (nodeData, color) => {
+  const { specificType, visualGroup } = classifyGraphNode(nodeData)
   selectedItem.value = {
     type: 'node',
     data: nodeData,
     color: color,
-    entityType: nodeData.labels?.find(l => l !== 'Entity' && l !== 'Node') || 'Entity'
+    entityType: visualGroup,
+    specificType
   }
 }
 
@@ -915,12 +910,17 @@ const renderGraph = () => {
     nodeMap[n.uuid] = n
   })
   
-  const nodes = nodesData.map(n => ({
-    id: n.uuid,
-    name: n.name || '未命名',
-    type: n.labels?.find(l => l !== 'Entity' && l !== 'Node') || 'Entity',
-    rawData: n // 保存原始数据
-  }))
+  const nodes = nodesData.map(n => {
+    const { visualGroup, specificType } = classifyGraphNode(n)
+
+    return {
+      id: n.uuid,
+      name: n.name || '未命名',
+      type: visualGroup,
+      specificType,
+      rawData: n // 保存原始数据
+    }
+  })
   
   // 创建节点ID集合用于过滤有效边
   const nodeIds = new Set(nodes.map(n => n.id))
@@ -942,9 +942,10 @@ const renderGraph = () => {
   
   // 颜色映射
   const types = [...new Set(nodes.map(n => n.type))]
+  const legendColorMap = Object.fromEntries(entityTypes.value.map(type => [type.name, type.color]))
   const colorScale = d3.scaleOrdinal()
     .domain(types)
-    .range(['#FF6B35', '#004E89', '#7B2D8E', '#1A936F', '#C5283D', '#E9724C', '#2D3436', '#6C5CE7'])
+    .range(types.map(type => legendColorMap[type] || '#999'))
   
   // 力导向布局
   const simulation = d3.forceSimulation(nodes)

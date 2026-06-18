@@ -72,6 +72,11 @@
               <span class="detail-label">Created:</span>
               <span class="detail-value">{{ formatDateTime(selectedItem.data.created_at) }}</span>
             </div>
+
+            <div class="detail-row" v-if="selectedItem.specificType && selectedItem.specificType !== selectedItem.entityType">
+              <span class="detail-label">Specific Type:</span>
+              <span class="detail-value">{{ selectedItem.specificType }}</span>
+            </div>
             
             <!-- Properties -->
             <div class="detail-section" v-if="selectedItem.data.attributes && Object.keys(selectedItem.data.attributes).length > 0">
@@ -238,6 +243,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import * as d3 from 'd3'
+import { buildEntityTypeLegend, classifyGraphNode } from '../utils/graphNodeClassifier'
 
 const props = defineProps({
   graphData: Object,
@@ -283,19 +289,7 @@ const toggleSelfLoop = (id) => {
 
 // 计算实体类型用于图例
 const entityTypes = computed(() => {
-  if (!props.graphData?.nodes) return []
-  const typeMap = {}
-  // 美观的颜色调色板
-  const colors = ['#FF6B35', '#004E89', '#7B2D8E', '#1A936F', '#C5283D', '#E9724C', '#3498db', '#9b59b6', '#27ae60', '#f39c12']
-  
-  props.graphData.nodes.forEach(node => {
-    const type = node.labels?.find(l => l !== 'Entity') || 'Entity'
-    if (!typeMap[type]) {
-      typeMap[type] = { name: type, count: 0, color: colors[Object.keys(typeMap).length % colors.length] }
-    }
-    typeMap[type].count++
-  })
-  return Object.values(typeMap)
+  return buildEntityTypeLegend(props.graphData?.nodes || [])
 })
 
 // 格式化时间
@@ -353,12 +347,17 @@ const renderGraph = () => {
   const nodeMap = {}
   nodesData.forEach(n => nodeMap[n.uuid] = n)
   
-  const nodes = nodesData.map(n => ({
-    id: n.uuid,
-    name: n.name || 'Unnamed',
-    type: n.labels?.find(l => l !== 'Entity') || 'Entity',
-    rawData: n
-  }))
+  const nodes = nodesData.map(n => {
+    const { visualGroup, specificType } = classifyGraphNode(n)
+
+    return {
+      id: n.uuid,
+      name: n.name || 'Unnamed',
+      type: visualGroup,
+      specificType,
+      rawData: n
+    }
+  })
   
   const nodeIds = new Set(nodes.map(n => n.id))
   
@@ -711,6 +710,7 @@ const renderGraph = () => {
         type: 'node',
         data: d.rawData,
         entityType: d.type,
+        specificType: d.specificType,
         color: getColor(d.type)
       }
     })
