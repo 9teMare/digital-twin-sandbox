@@ -1,22 +1,17 @@
 const DEFAULT_LABELS = new Set(['Entity', 'Node'])
 
-const ENTITY_PERSON_TERMS = [
+const PEOPLE_TYPES = new Set([
   'person',
+  'campaigncreator',
   'user',
   'participant',
-  'customer',
-  'member',
-  'account',
-  'profile',
-  'persona',
-  'trader',
-  'investor',
-  'influencer',
   'creator',
+  'influencer',
   'student',
   'professor',
   'official',
   'executive',
+  'customer',
   'ceo',
   'founder',
   'employee',
@@ -26,53 +21,37 @@ const ENTITY_PERSON_TERMS = [
   'doctor',
   'alumni',
   'expert',
-  'faculty'
-]
+  'faculty',
+  'trader',
+  'investor'
+])
 
-const ENTITY_NON_PERSON_TERMS = [
-  'campaigncreator',
-  'campaign_creator',
-  'date',
-  'time',
-  'timestamp',
-  'version',
-  'uid',
-  'uuid',
-  'id',
-  'hash',
-  'code',
-  'field',
-  'config',
-  'parameter',
-  'metric',
-  'score',
-  'rate',
-  'count',
-  'registration',
-  'register',
-  'signup',
-  'deposit',
-  'transaction',
-  'trading',
-  'trade',
-  'task',
-  'reward',
-  'step',
-  'status',
-  'language',
-  'risk',
-  'channel',
-  'property'
-]
+const ORGANIZATION_TYPES = new Set([
+  'organization',
+  'company',
+  'university',
+  'governmentagency',
+  'mediaoutlet',
+  'hospital',
+  'school',
+  'ngo',
+  'nonprofit',
+  'platform',
+  'socialmediaplatform',
+  'community',
+  'association',
+  'group',
+  'team'
+])
 
 const FIXED_GROUP_COLORS = {
-  Entity: '#FF6B35',
+  People: '#1A936F',
   Organization: '#004E89',
-  CampaignCreator: '#7B2D8E',
-  People: '#1A936F'
+  Entity: '#FF6B35'
 }
 
 const OTHER_TYPE_COLORS = [
+  '#7B2D8E',
   '#C5283D',
   '#E9724C',
   '#3498db',
@@ -85,56 +64,40 @@ const OTHER_TYPE_COLORS = [
 
 const normalizeType = (type) => String(type || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
 
-const normalizeText = (value) => String(value || '').toLowerCase()
-
-const flattenAttributes = (attributes = {}) => (
-  Object.entries(attributes)
-    .flatMap(([key, value]) => [key, value])
-    .filter(value => value !== null && value !== undefined)
-    .map(value => String(value))
-)
-
-const buildSearchText = (node) => {
-  const parts = [
-    node?.name,
-    node?.summary,
-    ...flattenAttributes(node?.attributes || {})
-  ]
-
-  return normalizeText(parts.filter(Boolean).join(' '))
-}
-
-const includesTerm = (text, term) => {
-  const normalizedTerm = normalizeText(term)
-  const compactText = text.replace(/[^a-z0-9]+/g, '')
-  const compactTerm = normalizedTerm.replace(/[^a-z0-9]+/g, '')
-
-  return text.includes(normalizedTerm) || compactText.includes(compactTerm)
-}
-
-const isPureEntityPerson = (node) => {
-  const text = buildSearchText(node)
-
-  if (!text) {
-    return false
-  }
-
-  if (ENTITY_NON_PERSON_TERMS.some(term => includesTerm(text, term))) {
-    return false
-  }
-
-  return ENTITY_PERSON_TERMS.some(term => includesTerm(text, term))
-}
-
 export const getSpecificType = (labels = []) => (
   labels.find(label => label && !DEFAULT_LABELS.has(label)) || 'Entity'
 )
 
-export const getVisualGroup = (specificType, node = null) => {
+export const getVisualGroup = (specificType) => {
   const normalized = normalizeType(specificType)
 
   if (!normalized || normalized === 'entity') {
-    return isPureEntityPerson(node) ? 'People' : 'Entity'
+    return 'Entity'
+  }
+
+  if (
+    PEOPLE_TYPES.has(normalized) ||
+    normalized.endsWith('person') ||
+    normalized.endsWith('user') ||
+    normalized.endsWith('creator') ||
+    normalized.endsWith('participant') ||
+    normalized.endsWith('customer') ||
+    normalized.endsWith('influencer')
+  ) {
+    return 'People'
+  }
+
+  if (
+    ORGANIZATION_TYPES.has(normalized) ||
+    normalized.endsWith('organization') ||
+    normalized.endsWith('company') ||
+    normalized.endsWith('agency') ||
+    normalized.endsWith('institution') ||
+    normalized.endsWith('platform') ||
+    normalized.endsWith('community') ||
+    normalized.endsWith('group')
+  ) {
+    return 'Organization'
   }
 
   return specificType || 'Entity'
@@ -149,7 +112,7 @@ export const getVisualGroupColor = (visualGroup, index = 0) => {
 
 export const classifyGraphNode = (node) => {
   const specificType = getSpecificType(node?.labels || [])
-  const visualGroup = getVisualGroup(specificType, node)
+  const visualGroup = getVisualGroup(specificType)
 
   return {
     specificType,
