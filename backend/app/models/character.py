@@ -22,41 +22,46 @@ from ..config import Config
 
 
 # 列表型字段（导入时按分隔符拆分）
-_LIST_FIELDS = {"preferred_assets", "tags"}
+_LIST_FIELDS = {"preferred_assets", "tags", "activity_ids"}
 # 整数型字段
-_INT_FIELDS = {"age"}
+_INT_FIELDS = {"vip_level", "orders_30d", "orders_90d", "positions", "activities_90d"}
+# 浮点型字段（金额 / 交易量；导入时去除千分位逗号）
+_FLOAT_FIELDS = {"volume_30d", "volume_90d", "fees_30d", "fees_90d", "rewards_claimed"}
 # 布尔型字段
 _BOOL_FIELDS = {"enabled", "zep_enrich"}
 
-# CSV/JSON 导入时的表头同义词映射 -> 标准字段名
+# CSV/TSV/JSON 导入时的表头同义词映射 -> 标准字段名。
+# 同时支持交易所导出的中文表头与英文 snake_case，方便直接粘贴原始数据。
 _IMPORT_ALIASES = {
-    # 身份 / KYC
-    "name": "name", "full_name": "name", "fullname": "name",
-    "age": "age",
-    "gender": "gender", "sex": "gender",
-    "occupation": "occupation", "job": "occupation", "profession": "occupation",
-    "jurisdiction": "jurisdiction", "country": "jurisdiction", "region": "jurisdiction", "residence": "jurisdiction",
-    "source_of_income": "source_of_income", "income_source": "source_of_income",
-    "income_band": "income_band", "annual_income": "income_band", "income": "income_band",
-    "net_worth_band": "net_worth_band", "net_worth": "net_worth_band", "networth": "net_worth_band",
-    "kyc_tier": "kyc_tier", "kyc_level": "kyc_tier", "kyc": "kyc_tier",
-    # 风险 / 意图
+    # 账户 / 身份
+    "uid": "uid", "user_id": "uid", "用户id": "uid", "用户uid": "uid",
+    "name": "name", "用户名": "name", "nickname": "name",
+    "region": "region", "secondary_region": "region", "二级区域": "region", "地区": "region",
+    "user_source": "user_source", "registration_source": "user_source",
+    "channel": "user_source", "用户来源": "user_source", "来源": "user_source",
+    "registered_at": "registered_at", "registration_time": "registered_at",
+    "register_time": "registered_at", "reg_time": "registered_at", "注册时间": "registered_at",
+    "vip_level": "vip_level", "vip": "vip_level", "vip_tier": "vip_level",
+    "vip等级": "vip_level", "vip_等级": "vip_level",
+    # 交易行为（近 30 / 90 天）
+    "orders_30d": "orders_30d", "order_count_30d": "orders_30d", "近30天交易订单数": "orders_30d",
+    "orders_90d": "orders_90d", "order_count_90d": "orders_90d", "近90天交易订单数": "orders_90d",
+    "volume_30d": "volume_30d", "trading_volume_30d": "volume_30d", "近30天交易量": "volume_30d",
+    "volume_90d": "volume_90d", "trading_volume_90d": "volume_90d", "近90天交易量": "volume_90d",
+    "fees_30d": "fees_30d", "trading_fees_30d": "fees_30d", "fee_30d": "fees_30d", "近30天交易手续费": "fees_30d",
+    "fees_90d": "fees_90d", "trading_fees_90d": "fees_90d", "fee_90d": "fees_90d", "近90天交易手续费": "fees_90d",
+    "main_product": "main_product", "primary_product": "main_product", "product": "main_product", "主要交易产品": "main_product",
+    "main_coin": "main_coin", "primary_coin": "main_coin", "main_symbol": "main_coin",
+    "symbol": "main_coin", "coin": "main_coin", "主要交易币种": "main_coin",
+    "positions": "positions", "position_count": "positions", "holdings": "positions", "持仓": "positions",
+    # 活动参与
+    "activities_90d": "activities_90d", "activity_count_90d": "activities_90d", "近90天参与活动数": "activities_90d",
+    "activity_ids": "activity_ids", "activity_id": "activity_ids", "近90天参与活动id": "activity_ids",
+    "rewards_claimed": "rewards_claimed", "reward_amount": "rewards_claimed",
+    "rewards": "rewards_claimed", "claimed_rewards": "rewards_claimed", "领取奖励金额": "rewards_claimed",
+    # 分析 / 人设（可选，用于驱动模拟）
     "risk_type": "risk_type", "risk": "risk_type", "risk_appetite": "risk_type", "risk_tolerance": "risk_type",
-    "purpose": "purpose", "purpose_of_using_exchange": "purpose", "use_purpose": "purpose", "goal": "purpose",
-    "experience_level": "experience_level", "experience": "experience_level", "trading_experience": "experience_level",
-    # 交易行为
     "preferred_assets": "preferred_assets", "assets": "preferred_assets", "favorite_assets": "preferred_assets",
-    "avg_position_size": "avg_position_size", "position_size": "avg_position_size", "average_position_size": "avg_position_size",
-    "trading_frequency": "trading_frequency", "frequency": "trading_frequency",
-    "holding_style": "holding_style", "holding_period": "holding_style", "trader_type": "holding_style",
-    "leverage_usage": "leverage_usage", "leverage": "leverage_usage",
-    "derivatives_usage": "derivatives_usage", "derivatives": "derivatives_usage",
-    "reaction_to_volatility": "reaction_to_volatility", "volatility_reaction": "reaction_to_volatility",
-    "deposit_withdrawal_pattern": "deposit_withdrawal_pattern", "deposit_pattern": "deposit_withdrawal_pattern", "withdrawal_pattern": "deposit_withdrawal_pattern",
-    # 心理 / 人设
-    "sentiment_bias": "sentiment_bias", "sentiment": "sentiment_bias", "bias": "sentiment_bias",
-    "fomo_susceptibility": "fomo_susceptibility", "fomo": "fomo_susceptibility",
-    "social_influence": "social_influence", "influence": "social_influence",
     "bio": "bio", "description": "bio",
     "persona": "persona", "persona_text": "persona",
     # 其他
@@ -69,7 +74,7 @@ _IMPORT_ALIASES = {
 
 @dataclass
 class Character:
-    """加密货币交易所用户角色数据模型"""
+    """加密货币交易所用户角色数据模型（字段对齐交易所真实导出数据）"""
     character_id: str
     name: str
     created_at: str
@@ -79,35 +84,32 @@ class Character:
     enabled: bool = True
     tags: List[str] = field(default_factory=list)
 
-    # 身份 / KYC
-    age: Optional[int] = None
-    gender: Optional[str] = None       # male | female | other
-    occupation: Optional[str] = None
-    jurisdiction: Optional[str] = None
-    source_of_income: Optional[str] = None
-    income_band: Optional[str] = None
-    net_worth_band: Optional[str] = None
-    kyc_tier: Optional[str] = None
+    # 账户 / 身份
+    uid: Optional[str] = None             # 交易所用户 UID
+    region: Optional[str] = None          # 二级区域
+    user_source: Optional[str] = None     # 用户来源（注册渠道）
+    registered_at: Optional[str] = None   # 注册时间
+    vip_level: Optional[int] = None       # VIP 等级
 
-    # 风险 / 意图
-    risk_type: Optional[str] = None
-    purpose: Optional[str] = None
-    experience_level: Optional[str] = None
+    # 交易行为（近 30 / 90 天）
+    orders_30d: Optional[int] = None      # 近30天交易订单数
+    orders_90d: Optional[int] = None      # 近90天交易订单数
+    volume_30d: Optional[float] = None    # 近30天交易量
+    volume_90d: Optional[float] = None    # 近90天交易量
+    fees_30d: Optional[float] = None      # 近30天交易手续费
+    fees_90d: Optional[float] = None      # 近90天交易手续费
+    main_product: Optional[str] = None    # 主要交易产品
+    main_coin: Optional[str] = None       # 主要交易币种
+    positions: Optional[int] = None       # 持仓
 
-    # 交易行为
+    # 活动参与（近 90 天）
+    activities_90d: Optional[int] = None  # 近90天参与活动数
+    activity_ids: List[str] = field(default_factory=list)  # 近90天参与活动id
+    rewards_claimed: Optional[float] = None  # 领取奖励金额
+
+    # 分析 / 人设（可选，用于驱动模拟）
     preferred_assets: List[str] = field(default_factory=list)
-    avg_position_size: Optional[str] = None
-    trading_frequency: Optional[str] = None
-    holding_style: Optional[str] = None
-    leverage_usage: Optional[str] = None
-    derivatives_usage: Optional[str] = None
-    reaction_to_volatility: Optional[str] = None
-    deposit_withdrawal_pattern: Optional[str] = None
-
-    # 心理 / 人设
-    sentiment_bias: Optional[str] = None
-    fomo_susceptibility: Optional[str] = None
-    social_influence: Optional[str] = None
+    risk_type: Optional[str] = None
     bio: Optional[str] = None
     persona: Optional[str] = None
 
@@ -128,14 +130,28 @@ class Character:
         clean = {k: v for k, v in data.items() if k in known}
         # 兜底必需字段
         clean.setdefault("character_id", f"char_{uuid.uuid4().hex[:12]}")
-        clean.setdefault("name", "Unnamed User")
+        # 无显式名称时用 UID 兜底（交易所数据通常仅有 uid）
+        if not clean.get("name"):
+            uid = clean.get("uid")
+            clean["name"] = f"User {uid}" if uid not in (None, "") else "Unnamed User"
         now = datetime.now().isoformat()
         clean.setdefault("created_at", now)
         clean.setdefault("updated_at", now)
         return cls(**clean)
 
+    @staticmethod
+    def _fmt_num(value: Any) -> str:
+        """格式化数值：整数去掉小数点，浮点保留紧凑形式并加千分位。"""
+        try:
+            f = float(value)
+        except (TypeError, ValueError):
+            return str(value)
+        if f == int(f):
+            return f"{int(f):,}"
+        return f"{f:,.2f}"
+
     def compose_persona(self) -> str:
-        """根据结构化字段拼装一段可读的人设文本（当 persona 为空时使用）。
+        """根据交易所行为字段拼装一段可读的人设文本（当 persona 为空时使用）。
 
         既用于界面展示，也作为后续构建 OASIS profile 的基础。
         """
@@ -143,50 +159,60 @@ class Character:
             return self.persona
 
         parts: List[str] = []
-        identity = []
-        if self.age:
-            identity.append(f"{self.age}-year-old")
-        if self.occupation:
-            identity.append(self.occupation)
-        if self.jurisdiction:
-            identity.append(f"based in {self.jurisdiction}")
-        if identity:
-            parts.append(f"{self.name} is a " + " ".join(identity) + ".")
-        else:
-            parts.append(f"{self.name} is a crypto exchange user.")
 
-        if self.source_of_income:
-            parts.append(f"Primary source of income: {self.source_of_income}.")
-        if self.income_band or self.net_worth_band:
-            wealth = ", ".join(x for x in [self.income_band, self.net_worth_band] if x)
-            parts.append(f"Financial profile: {wealth}.")
+        # 身份：地区 + 主要产品 + VIP 等级 + 注册渠道/时间
+        product = self.main_product or "crypto"
+        intro = f"{self.name} is a"
+        if self.region:
+            intro += f" {self.region}"
+        intro += f" {product} trader on the exchange"
+        if self.vip_level is not None:
+            intro += f" (VIP level {self.vip_level})"
+        if self.registered_at:
+            via = f" via {self.user_source}" if self.user_source else ""
+            intro += f", who registered{via} on {self.registered_at}"
+        elif self.user_source:
+            intro += f", who joined via {self.user_source}"
+        parts.append(intro + ".")
+
+        # 近 30 / 90 天交易行为
+        activity: List[str] = []
+        seg30 = []
+        if self.orders_30d is not None:
+            seg30.append(f"{self._fmt_num(self.orders_30d)} orders")
+        if self.volume_30d is not None:
+            seg30.append(f"a trading volume of {self._fmt_num(self.volume_30d)}")
+        if self.fees_30d is not None:
+            seg30.append(f"{self._fmt_num(self.fees_30d)} in fees")
+        if seg30:
+            activity.append("over the last 30 days they made " + ", ".join(seg30))
+        seg90 = []
+        if self.orders_90d is not None:
+            seg90.append(f"{self._fmt_num(self.orders_90d)} orders")
+        if self.volume_90d is not None:
+            seg90.append(f"{self._fmt_num(self.volume_90d)} volume")
+        if self.fees_90d is not None:
+            seg90.append(f"{self._fmt_num(self.fees_90d)} in fees")
+        if seg90:
+            activity.append("over 90 days, " + ", ".join(seg90))
+        if activity:
+            parts.append("In terms of activity, " + "; ".join(activity) + ".")
+
+        # 主要币种 / 持仓
+        if self.main_coin:
+            parts.append(f"Their most-traded instrument is {self.main_coin}.")
+        if self.positions is not None:
+            parts.append(f"They currently hold {self._fmt_num(self.positions)} open positions.")
+
+        # 活动参与 / 奖励
+        if self.activities_90d is not None:
+            s = f"In the last 90 days they joined {self._fmt_num(self.activities_90d)} exchange promotions"
+            if self.rewards_claimed is not None:
+                s += f" and claimed {self._fmt_num(self.rewards_claimed)} in rewards"
+            parts.append(s + ".")
+
         if self.risk_type:
-            parts.append(f"Risk profile is {self.risk_type}.")
-        if self.purpose:
-            parts.append(f"Uses the exchange mainly for {self.purpose}.")
-        if self.experience_level:
-            parts.append(f"Trading experience: {self.experience_level}.")
-
-        behavior = []
-        if self.preferred_assets:
-            behavior.append("prefers " + ", ".join(self.preferred_assets))
-        if self.holding_style:
-            behavior.append(f"a {self.holding_style}")
-        if self.trading_frequency:
-            behavior.append(f"trades {self.trading_frequency}")
-        if self.avg_position_size:
-            behavior.append(f"typical position size {self.avg_position_size}")
-        if self.leverage_usage:
-            behavior.append(f"leverage usage: {self.leverage_usage}")
-        if behavior:
-            parts.append("Trading behavior: " + "; ".join(behavior) + ".")
-
-        if self.reaction_to_volatility:
-            parts.append(f"When markets are volatile, they tend to {self.reaction_to_volatility}.")
-        if self.sentiment_bias:
-            parts.append(f"Generally {self.sentiment_bias} on the market.")
-        if self.fomo_susceptibility:
-            parts.append(f"FOMO/FUD susceptibility: {self.fomo_susceptibility}.")
+            parts.append(f"Risk profile: {self.risk_type}.")
 
         return " ".join(parts)
 
@@ -240,7 +266,7 @@ class CharacterManager:
             q = query.lower()
             def _match(it: Dict[str, Any]) -> bool:
                 haystack = " ".join(str(it.get(k, "")) for k in
-                                    ("name", "occupation", "risk_type", "purpose", "jurisdiction"))
+                                    ("name", "uid", "region", "main_product", "main_coin", "risk_type"))
                 haystack += " " + " ".join(it.get("preferred_assets") or [])
                 return q in haystack.lower()
             items = [it for it in items if _match(it)]
@@ -360,6 +386,13 @@ class CharacterManager:
                 continue
             mapped[field_name] = cls._coerce_value(field_name, value)
 
+        # 交易所数据通常只有 uid 而无姓名：用 uid 兜底名称
+        if not mapped.get("name") and mapped.get("uid") not in (None, ""):
+            mapped["name"] = f"User {mapped['uid']}"
+        # 主要交易币种自动填入偏好资产（用于模拟话题）
+        if not mapped.get("preferred_assets") and mapped.get("main_coin"):
+            mapped["preferred_assets"] = [mapped["main_coin"]]
+
         if extra:
             mapped["extra"] = extra
         return mapped
@@ -375,7 +408,13 @@ class CharacterManager:
             return [p.strip() for p in parts if p.strip()]
         if field_name in _INT_FIELDS:
             try:
-                return int(float(str(value).strip()))
+                # 去除千分位逗号（如 "1,457"）后再解析
+                return int(float(str(value).replace(",", "").strip()))
+            except (ValueError, TypeError):
+                return None
+        if field_name in _FLOAT_FIELDS:
+            try:
+                return float(str(value).replace(",", "").strip())
             except (ValueError, TypeError):
                 return None
         if field_name in _BOOL_FIELDS:
@@ -386,6 +425,13 @@ class CharacterManager:
 
     @classmethod
     def parse_csv(cls, content: str) -> List[Dict[str, Any]]:
-        """解析 CSV 文本为原始行字典列表（表头保持原样，映射在导入时进行）。"""
-        reader = csv.DictReader(io.StringIO(content))
+        """解析 CSV/TSV 文本为原始行字典列表（表头保持原样，映射在导入时进行）。
+
+        自动识别分隔符：含制表符时按 TSV 解析（交易所导出常为制表符分隔，
+        且数值带千分位逗号，无法用逗号分隔）。
+        """
+        content = content.lstrip("\ufeff")
+        first_line = next((ln for ln in content.splitlines() if ln.strip()), "")
+        delimiter = "\t" if "\t" in first_line else ","
+        reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
         return [dict(row) for row in reader]

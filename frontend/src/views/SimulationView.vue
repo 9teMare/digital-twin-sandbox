@@ -60,6 +60,7 @@
           @next-step="handleNextStep"
           @add-log="addLog"
           @update-status="updateStatus"
+          @refresh-graph="refreshGraph"
         />
       </div>
     </main>

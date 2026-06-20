@@ -34,6 +34,21 @@ export function buildGraph(data) {
 }
 
 /**
+ * 将选定的用户库角色注入已有图谱（GraphRAG），返回异步 task_id
+ * @param {Object} data - { graph_id 或 project_id, character_ids: [] }
+ * @returns {Promise}
+ */
+export function enrichCharacters(data) {
+  return requestWithRetry(() =>
+    service({
+      url: '/api/graph/enrich-characters',
+      method: 'post',
+      data
+    })
+  )
+}
+
+/**
  * 查询任务状态
  * @param {String} taskId - 任务ID
  * @returns {Promise}

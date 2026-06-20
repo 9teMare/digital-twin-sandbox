@@ -26,9 +26,9 @@
             >
               <input type="checkbox" :value="c.character_id" v-model="selectedCharacterIds" />
               <span class="roster-name">{{ c.name }}</span>
-              <span class="roster-meta">{{ c.occupation || '—' }}</span>
-              <span v-if="c.risk_type" class="roster-chip">{{ c.risk_type }}</span>
-              <span class="roster-assets">{{ (c.preferred_assets || []).slice(0, 3).join(', ') }}</span>
+              <span class="roster-meta">{{ c.region || '—' }}</span>
+              <span v-if="c.vip_level != null" class="roster-chip">VIP {{ c.vip_level }}</span>
+              <span class="roster-assets">{{ c.main_coin || (c.preferred_assets || [])[0] || '' }}</span>
             </label>
           </div>
           <div class="roster-actions">
@@ -37,6 +37,25 @@
               {{ $t('characters.rosterUseSelected', { n: selectedCharacterIds.length }) }}
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Step 00b: 将选定角色注入图谱（GraphRAG） -->
+      <div v-if="enriching" class="step-card active roster-card">
+        <div class="card-header">
+          <div class="step-info">
+            <span class="step-num">00</span>
+            <span class="step-title">{{ $t('characters.enrichTitle') }}</span>
+          </div>
+          <span class="badge processing">{{ enrichProgress }}%</span>
+        </div>
+        <div class="card-content">
+          <p class="api-note">POST /api/graph/enrich-characters</p>
+          <p class="description">{{ $t('characters.enrichDesc') }}</p>
+          <div class="enrich-progress">
+            <div class="enrich-progress-fill" :style="{ width: enrichProgress + '%' }"></div>
+          </div>
+          <p class="enrich-message mono">{{ enrichMessage }}</p>
         </div>
       </div>
 
@@ -681,6 +700,7 @@ import {
   getSimulationConfigRealtime
 } from '../api/simulation'
 import { listCharacters } from '../api/character'
+import { enrichCharacters, getTaskStatus } from '../api/graph'
 
 const { t } = useI18n()
 
@@ -691,7 +711,7 @@ const props = defineProps({
   systemLogs: Array
 })
 
-const emit = defineEmits(['go-back', 'next-step', 'add-log', 'update-status'])
+const emit = defineEmits(['go-back', 'next-step', 'add-log', 'update-status', 'refresh-graph'])
 
 // State
 const phase = ref(0) // 0: 初始化, 1: 生成人设, 2: 生成配置, 3: 完成
@@ -702,6 +722,11 @@ const librarySelecting = ref(false)
 const libraryCharacters = ref([])
 const selectedCharacterIds = ref([])
 const rosterQuery = ref('')
+
+// 图谱增强（把选定角色注入 GraphRAG）
+const enriching = ref(false)
+const enrichMessage = ref('')
+const enrichProgress = ref(0)
 const prepareProgress = ref(0)
 const currentStage = ref('')
 const progressMessage = ref('')
@@ -1129,7 +1154,7 @@ const filteredLibrary = computed(() => {
   const q = rosterQuery.value.trim().toLowerCase()
   if (!q) return libraryCharacters.value
   return libraryCharacters.value.filter(c =>
-    `${c.name || ''} ${c.occupation || ''} ${c.risk_type || ''} ${(c.preferred_assets || []).join(' ')}`
+    `${c.name || ''} ${c.uid || ''} ${c.region || ''} ${c.main_product || ''} ${c.main_coin || ''} ${(c.preferred_assets || []).join(' ')}`
       .toLowerCase().includes(q)
   )
 })
@@ -1138,8 +1163,69 @@ const selectAllRoster = () => {
   selectedCharacterIds.value = filteredLibrary.value.map(c => c.character_id)
 }
 const clearRoster = () => { selectedCharacterIds.value = [] }
-const confirmRoster = () => { startPrepareSimulation([...selectedCharacterIds.value]) }
+
+// 确认名单：先把选定角色注入图谱（GraphRAG），再准备模拟
+const confirmRoster = async () => {
+  const ids = [...selectedCharacterIds.value]
+  if (!ids.length) return
+  librarySelecting.value = false
+  await enrichGraphWithRoster(ids)
+  startPrepareSimulation(ids)
+}
 const useAutoSeed = () => { startPrepareSimulation(null) }
+
+// 将选定角色注入已构建的图谱，并在完成后刷新图谱面板
+const enrichGraphWithRoster = async (characterIds) => {
+  const graphId = props.projectData?.graph_id
+  if (!graphId || !characterIds.length) return
+
+  enriching.value = true
+  enrichProgress.value = 0
+  enrichMessage.value = t('characters.enrichStarted', { n: characterIds.length })
+  addLog(t('characters.enrichStarted', { n: characterIds.length }))
+  emit('update-status', 'processing')
+
+  try {
+    const res = await enrichCharacters({ graph_id: graphId, character_ids: characterIds })
+    if (!res.success || !res.data?.task_id) {
+      addLog(t('characters.enrichFailed', { error: res.error || t('common.unknownError') }))
+      return
+    }
+    const tId = res.data.task_id
+
+    // 轮询注入任务，最长约 10 分钟
+    const deadline = Date.now() + 10 * 60 * 1000
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 2500))
+      let st
+      try {
+        st = await getTaskStatus(tId)
+      } catch (e) {
+        continue
+      }
+      const task = st?.data
+      if (!task) continue
+      if (typeof task.progress === 'number') enrichProgress.value = task.progress
+      if (task.message) enrichMessage.value = task.message
+
+      if (task.status === 'completed') {
+        const added = task.result?.added_characters ?? characterIds.length
+        addLog(t('characters.enrichDone', { n: added }))
+        emit('refresh-graph')
+        return
+      }
+      if (task.status === 'failed') {
+        addLog(t('characters.enrichFailed', { error: task.error || t('common.unknownError') }))
+        return
+      }
+    }
+    addLog(t('characters.enrichFailed', { error: t('common.unknownError') }))
+  } catch (e) {
+    addLog(t('characters.enrichFailed', { error: e.message }))
+  } finally {
+    enriching.value = false
+  }
+}
 
 // 初始化：若已准备完成则直接加载；否则按用户库决定是否展示名单选择
 const initStep2 = async () => {
@@ -1285,6 +1371,26 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .roster-primary:disabled { background: #FFB59E; cursor: not-allowed; }
+
+/* 图谱增强进度 */
+.enrich-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-muted);
+  overflow: hidden;
+  margin: 12px 0 8px;
+}
+.enrich-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.enrich-message {
+  font-size: 12px;
+  color: var(--text-muted);
+  word-break: break-word;
+}
 
 /* Step Card */
 .step-card {

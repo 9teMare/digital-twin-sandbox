@@ -51,27 +51,28 @@
         <thead>
           <tr>
             <th>{{ $t('characters.fName') }}</th>
-            <th>{{ $t('characters.fAge') }}</th>
-            <th>{{ $t('characters.fOccupation') }}</th>
-            <th>{{ $t('characters.fRiskType') }}</th>
-            <th>{{ $t('characters.fPurpose') }}</th>
-            <th>{{ $t('characters.fAssets') }}</th>
+            <th>{{ $t('characters.fRegion') }}</th>
+            <th>{{ $t('characters.fVipLevel') }}</th>
+            <th>{{ $t('characters.fMainProduct') }}</th>
+            <th>{{ $t('characters.fMainCoin') }}</th>
+            <th>{{ $t('characters.fOrders90d') }}</th>
+            <th>{{ $t('characters.fVolume90d') }}</th>
             <th>{{ $t('characters.fStatus') }}</th>
             <th class="actions-col">{{ $t('characters.fActions') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="c in characters" :key="c.character_id">
-            <td class="name-cell">{{ c.name }}</td>
-            <td>{{ c.age ?? '—' }}</td>
-            <td>{{ c.occupation || '—' }}</td>
-            <td><span v-if="c.risk_type" class="chip" :class="riskClass(c.risk_type)">{{ c.risk_type }}</span><span v-else>—</span></td>
-            <td>{{ c.purpose || '—' }}</td>
-            <td>
-              <span v-for="a in (c.preferred_assets || []).slice(0, 3)" :key="a" class="chip asset">{{ a }}</span>
-              <span v-if="(c.preferred_assets || []).length > 3" class="more">+{{ c.preferred_assets.length - 3 }}</span>
-              <span v-if="!(c.preferred_assets || []).length">—</span>
+            <td class="name-cell">
+              {{ c.name }}
+              <span v-if="c.uid" class="uid-tag">#{{ c.uid }}</span>
             </td>
+            <td>{{ c.region || '—' }}</td>
+            <td><span v-if="c.vip_level != null" class="chip vip">VIP {{ c.vip_level }}</span><span v-else>—</span></td>
+            <td>{{ c.main_product || '—' }}</td>
+            <td><span v-if="c.main_coin" class="chip asset">{{ c.main_coin }}</span><span v-else>—</span></td>
+            <td>{{ fmtNum(c.orders_90d) }}</td>
+            <td>{{ fmtNum(c.volume_90d) }}</td>
             <td>
               <button class="toggle" :class="{ on: c.enabled }" @click="toggleEnabled(c)">
                 {{ c.enabled ? $t('characters.enabled') : $t('characters.disabled') }}
@@ -102,76 +103,59 @@
         </div>
         <div class="drawer-body">
           <fieldset>
-            <legend>{{ $t('characters.secIdentity') }}</legend>
-            <div class="field"><label>{{ $t('characters.fName') }} *</label><input v-model="form.name" /></div>
+            <legend>{{ $t('characters.secAccount') }}</legend>
             <div class="row2">
-              <div class="field"><label>{{ $t('characters.fAge') }}</label><input v-model.number="form.age" type="number" min="0" /></div>
-              <div class="field"><label>{{ $t('characters.fGender') }}</label>
-                <select v-model="form.gender"><option value="">—</option><option v-for="o in opts.gender" :key="o" :value="o">{{ o }}</option></select>
-              </div>
+              <div class="field"><label>{{ $t('characters.fUid') }}</label><input v-model="form.uid" /></div>
+              <div class="field"><label>{{ $t('characters.fName') }}</label><input v-model="form.name" :placeholder="$t('characters.nameHint')" /></div>
             </div>
             <div class="row2">
-              <div class="field"><label>{{ $t('characters.fOccupation') }}</label><input v-model="form.occupation" /></div>
-              <div class="field"><label>{{ $t('characters.fJurisdiction') }}</label><input v-model="form.jurisdiction" /></div>
+              <div class="field"><label>{{ $t('characters.fRegion') }}</label><input v-model="form.region" /></div>
+              <div class="field"><label>{{ $t('characters.fUserSource') }}</label><input v-model="form.user_source" /></div>
             </div>
             <div class="row2">
-              <div class="field"><label>{{ $t('characters.fSourceOfIncome') }}</label><input v-model="form.source_of_income" /></div>
-              <div class="field"><label>{{ $t('characters.fKycTier') }}</label><input v-model="form.kyc_tier" /></div>
-            </div>
-            <div class="row2">
-              <div class="field"><label>{{ $t('characters.fIncomeBand') }}</label><input v-model="form.income_band" /></div>
-              <div class="field"><label>{{ $t('characters.fNetWorthBand') }}</label><input v-model="form.net_worth_band" /></div>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>{{ $t('characters.secRisk') }}</legend>
-            <div class="row2">
-              <div class="field"><label>{{ $t('characters.fRiskType') }}</label>
-                <select v-model="form.risk_type"><option value="">—</option><option v-for="o in opts.risk_type" :key="o" :value="o">{{ o }}</option></select>
-              </div>
-              <div class="field"><label>{{ $t('characters.fExperience') }}</label>
-                <select v-model="form.experience_level"><option value="">—</option><option v-for="o in opts.experience_level" :key="o" :value="o">{{ o }}</option></select>
-              </div>
-            </div>
-            <div class="field"><label>{{ $t('characters.fPurpose') }}</label>
-              <select v-model="form.purpose"><option value="">—</option><option v-for="o in opts.purpose" :key="o" :value="o">{{ o }}</option></select>
+              <div class="field"><label>{{ $t('characters.fRegisteredAt') }}</label><input v-model="form.registered_at" :placeholder="$t('characters.dateHint')" /></div>
+              <div class="field"><label>{{ $t('characters.fVipLevel') }}</label><input v-model.number="form.vip_level" type="number" min="0" /></div>
             </div>
           </fieldset>
 
           <fieldset>
             <legend>{{ $t('characters.secTrading') }}</legend>
-            <div class="field"><label>{{ $t('characters.fAssets') }}</label><input v-model="preferredAssetsText" :placeholder="$t('characters.commaHint')" /></div>
             <div class="row2">
-              <div class="field"><label>{{ $t('characters.fHoldingStyle') }}</label>
-                <select v-model="form.holding_style"><option value="">—</option><option v-for="o in opts.holding_style" :key="o" :value="o">{{ o }}</option></select>
-              </div>
-              <div class="field"><label>{{ $t('characters.fFrequency') }}</label><input v-model="form.trading_frequency" /></div>
+              <div class="field"><label>{{ $t('characters.fOrders30d') }}</label><input v-model.number="form.orders_30d" type="number" min="0" /></div>
+              <div class="field"><label>{{ $t('characters.fOrders90d') }}</label><input v-model.number="form.orders_90d" type="number" min="0" /></div>
             </div>
             <div class="row2">
-              <div class="field"><label>{{ $t('characters.fPositionSize') }}</label><input v-model="form.avg_position_size" /></div>
-              <div class="field"><label>{{ $t('characters.fLeverage') }}</label>
-                <select v-model="form.leverage_usage"><option value="">—</option><option v-for="o in opts.leverage_usage" :key="o" :value="o">{{ o }}</option></select>
-              </div>
+              <div class="field"><label>{{ $t('characters.fVolume30d') }}</label><input v-model.number="form.volume_30d" type="number" min="0" step="any" /></div>
+              <div class="field"><label>{{ $t('characters.fVolume90d') }}</label><input v-model.number="form.volume_90d" type="number" min="0" step="any" /></div>
             </div>
             <div class="row2">
-              <div class="field"><label>{{ $t('characters.fDerivatives') }}</label><input v-model="form.derivatives_usage" /></div>
-              <div class="field"><label>{{ $t('characters.fDepositPattern') }}</label><input v-model="form.deposit_withdrawal_pattern" /></div>
+              <div class="field"><label>{{ $t('characters.fFees30d') }}</label><input v-model.number="form.fees_30d" type="number" min="0" step="any" /></div>
+              <div class="field"><label>{{ $t('characters.fFees90d') }}</label><input v-model.number="form.fees_90d" type="number" min="0" step="any" /></div>
             </div>
-            <div class="field"><label>{{ $t('characters.fVolatilityReaction') }}</label><input v-model="form.reaction_to_volatility" /></div>
+            <div class="row2">
+              <div class="field"><label>{{ $t('characters.fMainProduct') }}</label><input v-model="form.main_product" /></div>
+              <div class="field"><label>{{ $t('characters.fMainCoin') }}</label><input v-model="form.main_coin" /></div>
+            </div>
+            <div class="field"><label>{{ $t('characters.fPositions') }}</label><input v-model.number="form.positions" type="number" min="0" /></div>
           </fieldset>
 
           <fieldset>
-            <legend>{{ $t('characters.secPsych') }}</legend>
+            <legend>{{ $t('characters.secEngagement') }}</legend>
             <div class="row2">
-              <div class="field"><label>{{ $t('characters.fSentiment') }}</label>
-                <select v-model="form.sentiment_bias"><option value="">—</option><option v-for="o in opts.sentiment_bias" :key="o" :value="o">{{ o }}</option></select>
-              </div>
-              <div class="field"><label>{{ $t('characters.fFomo') }}</label>
-                <select v-model="form.fomo_susceptibility"><option value="">—</option><option v-for="o in opts.fomo_susceptibility" :key="o" :value="o">{{ o }}</option></select>
-              </div>
+              <div class="field"><label>{{ $t('characters.fActivities90d') }}</label><input v-model.number="form.activities_90d" type="number" min="0" /></div>
+              <div class="field"><label>{{ $t('characters.fRewardsClaimed') }}</label><input v-model.number="form.rewards_claimed" type="number" min="0" step="any" /></div>
             </div>
-            <div class="field"><label>{{ $t('characters.fSocialInfluence') }}</label><input v-model="form.social_influence" /></div>
+            <div class="field"><label>{{ $t('characters.fActivityIds') }}</label><input v-model="activityIdsText" :placeholder="$t('characters.semicolonHint')" /></div>
+          </fieldset>
+
+          <fieldset>
+            <legend>{{ $t('characters.secPersona') }}</legend>
+            <div class="row2">
+              <div class="field"><label>{{ $t('characters.fRiskType') }}</label>
+                <select v-model="form.risk_type"><option value="">—</option><option v-for="o in opts.risk_type" :key="o" :value="o">{{ o }}</option></select>
+              </div>
+              <div class="field"><label>{{ $t('characters.fAssets') }}</label><input v-model="preferredAssetsText" :placeholder="$t('characters.commaHint')" /></div>
+            </div>
             <div class="field"><label>{{ $t('characters.fBio') }}</label><textarea v-model="form.bio" rows="2"></textarea></div>
             <div class="field"><label>{{ $t('characters.fPersona') }}</label><textarea v-model="form.persona" rows="4" :placeholder="$t('characters.personaHint')"></textarea></div>
           </fieldset>
@@ -190,7 +174,7 @@
         </div>
         <div class="drawer-footer">
           <button class="btn ghost" @click="closeDrawer">{{ $t('characters.cancel') }}</button>
-          <button class="btn primary" :disabled="saving || !form.name" @click="save">{{ saving ? $t('characters.saving') : $t('characters.save') }}</button>
+          <button class="btn primary" :disabled="saving || (!form.name && !form.uid)" @click="save">{{ saving ? $t('characters.saving') : $t('characters.save') }}</button>
         </div>
       </aside>
     </div>
@@ -237,14 +221,14 @@ const router = useRouter()
 const { t } = useI18n()
 
 const opts = {
-  gender: ['male', 'female', 'other'],
-  risk_type: ['conservative', 'moderate', 'aggressive', 'degen'],
-  purpose: ['investment', 'speculation', 'active_trading', 'payments', 'yield', 'hedging'],
-  experience_level: ['beginner', 'intermediate', 'advanced', 'professional'],
-  holding_style: ['hodler', 'swing', 'day', 'scalper'],
-  leverage_usage: ['none', 'low', 'medium', 'high'],
-  sentiment_bias: ['bullish', 'bearish', 'neutral'],
-  fomo_susceptibility: ['low', 'medium', 'high']
+  risk_type: ['conservative', 'moderate', 'aggressive', 'degen']
+}
+
+function fmtNum(v) {
+  if (v === null || v === undefined || v === '') return '—'
+  const n = Number(v)
+  if (Number.isNaN(n)) return String(v)
+  return n.toLocaleString()
 }
 
 const PAGE_SIZE = 25
@@ -265,13 +249,6 @@ function notify(msg, type = 'ok') {
   toast.msg = msg; toast.type = type; toast.show = true
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => { toast.show = false }, 2600)
-}
-
-function riskClass(risk) {
-  return {
-    conservative: 'risk-low', moderate: 'risk-mid',
-    aggressive: 'risk-high', degen: 'risk-max'
-  }[risk] || ''
 }
 
 async function load() {
@@ -304,13 +281,11 @@ const form = reactive(blankForm())
 
 function blankForm() {
   return {
-    name: '', age: null, gender: '', occupation: '', jurisdiction: '',
-    source_of_income: '', income_band: '', net_worth_band: '', kyc_tier: '',
-    risk_type: '', purpose: '', experience_level: '',
-    preferred_assets: [], avg_position_size: '', trading_frequency: '',
-    holding_style: '', leverage_usage: '', derivatives_usage: '',
-    reaction_to_volatility: '', deposit_withdrawal_pattern: '',
-    sentiment_bias: '', fomo_susceptibility: '', social_influence: '',
+    name: '', uid: '', region: '', user_source: '', registered_at: '', vip_level: null,
+    orders_30d: null, orders_90d: null, volume_30d: null, volume_90d: null,
+    fees_30d: null, fees_90d: null, main_product: '', main_coin: '', positions: null,
+    activities_90d: null, activity_ids: [], rewards_claimed: null,
+    preferred_assets: [], risk_type: '',
     bio: '', persona: '', tags: [], enabled: true,
     zep_enrich: false, trading_history: ''
   }
@@ -319,6 +294,7 @@ function blankForm() {
 function setForm(data) {
   Object.assign(form, blankForm(), data)
   form.preferred_assets = data.preferred_assets || []
+  form.activity_ids = data.activity_ids || []
   form.tags = data.tags || []
 }
 
@@ -326,12 +302,16 @@ const preferredAssetsText = computed({
   get: () => (form.preferred_assets || []).join(', '),
   set: (v) => { form.preferred_assets = splitList(v) }
 })
+const activityIdsText = computed({
+  get: () => (form.activity_ids || []).join('; '),
+  set: (v) => { form.activity_ids = splitList(v, /[;,]/) }
+})
 const tagsText = computed({
   get: () => (form.tags || []).join(', '),
   set: (v) => { form.tags = splitList(v) }
 })
-function splitList(v) {
-  return String(v).split(',').map(s => s.trim()).filter(Boolean)
+function splitList(v, sep = ',') {
+  return String(v).split(sep).map(s => s.trim()).filter(Boolean)
 }
 
 function openCreate() { editingId.value = null; setForm(blankForm()); drawerOpen.value = true }
@@ -339,7 +319,7 @@ function openEdit(c) { editingId.value = c.character_id; setForm(c); drawerOpen.
 function closeDrawer() { drawerOpen.value = false }
 
 async function save() {
-  if (!form.name) return
+  if (!form.name && !form.uid) return
   saving.value = true
   try {
     const payload = JSON.parse(JSON.stringify(form))
@@ -489,6 +469,8 @@ onMounted(load)
   margin-right: 4px; font-family: 'JetBrains Mono', monospace;
 }
 .chip.asset { background: var(--bg-muted); color: var(--text-muted); }
+.chip.vip { background: #FFF1EC; color: #FF5722; }
+.uid-tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-faint); margin-left: 6px; }
 .chip.risk-low { background: #E8F5E9; color: #2E7D32; }
 .chip.risk-mid { background: #FFF8E1; color: #F57F17; }
 .chip.risk-high { background: #FFEBEE; color: #C62828; }

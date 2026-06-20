@@ -529,6 +529,138 @@ def build_graph():
         }), 500
 
 
+# ============== 接口2b：将用户库角色注入已有图谱 ==============
+
+@graph_bp.route('/enrich-characters', methods=['POST'])
+def enrich_characters():
+    """将选定的用户库角色作为额外 episodes 注入已构建的图谱（GraphRAG）。
+
+    使用户在 Step 2 挑选的角色成为知识图谱的一部分，并与种子场景中的实体建立关联。
+
+    请求（JSON）：
+        {
+            "character_ids": ["char_xxx", ...],   // 必填，用户挑选的角色
+            "graph_id": "...",                     // 与 project_id 二选一
+            "project_id": "proj_xxx"               // 与 graph_id 二选一（用于解析 graph_id）
+        }
+
+    返回：{ "task_id": ... }，复用 GET /api/graph/task/<task_id> 轮询进度。
+    """
+    try:
+        if not Config.ZEP_API_KEY:
+            return jsonify({
+                "success": False,
+                "error": t('api.configError', details=t('api.zepApiKeyMissing'))
+            }), 500
+
+        data = request.get_json() or {}
+        character_ids = data.get('character_ids') or []
+        if not character_ids:
+            return jsonify({"success": False, "error": t('api.requireCharacterIds')}), 400
+
+        # 解析 graph_id（优先直接给定，否则从 project 读取）
+        graph_id = data.get('graph_id')
+        if not graph_id and data.get('project_id'):
+            project = ProjectManager.get_project(data['project_id'])
+            if not project:
+                return jsonify({"success": False, "error": t('api.projectNotFound', id=data['project_id'])}), 404
+            graph_id = project.graph_id
+        if not graph_id:
+            return jsonify({"success": False, "error": t('api.graphNotBuilt')}), 400
+
+        # 载入角色并序列化为 episode 文本
+        from ..models.character import CharacterManager
+        from ..services.character_roster import build_episode_texts_from_characters
+
+        characters = [CharacterManager.get_character(cid) for cid in character_ids]
+        characters = [c for c in characters if c]
+        if not characters:
+            return jsonify({"success": False, "error": t('api.noValidCharacters')}), 400
+
+        episodes = build_episode_texts_from_characters(characters)
+
+        task_manager = TaskManager()
+        task_id = task_manager.create_task(
+            task_type="enrich_characters",
+            metadata={"graph_id": graph_id, "count": len(episodes)}
+        )
+        logger.info(f"创建角色注入任务: task_id={task_id}, graph_id={graph_id}, 角色数={len(episodes)}")
+
+        current_locale = get_locale()
+
+        def enrich_task():
+            set_locale(current_locale)
+            enrich_logger = get_logger('digital_twin_agent_sandbox.enrich')
+            try:
+                task_manager.update_task(
+                    task_id,
+                    status=TaskStatus.PROCESSING,
+                    progress=5,
+                    message=t('progress.enrichInjecting', count=len(episodes))
+                )
+                builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
+
+                def add_cb(msg, ratio):
+                    task_manager.update_task(task_id, message=msg, progress=5 + int(ratio * 45))
+
+                # 每个角色作为一个 episode；批量发送以与现有构建逻辑一致
+                episode_uuids = builder.add_text_batches(
+                    graph_id, episodes, batch_size=5, progress_callback=add_cb
+                )
+
+                def wait_cb(msg, ratio):
+                    task_manager.update_task(task_id, message=msg, progress=50 + int(ratio * 45))
+
+                builder._wait_for_episodes(episode_uuids, wait_cb)
+
+                task_manager.update_task(
+                    task_id, message=t('progress.fetchingGraphData'), progress=96
+                )
+                graph_data = builder.get_graph_data(graph_id)
+                node_count = graph_data.get("node_count", 0)
+                edge_count = graph_data.get("edge_count", 0)
+                enrich_logger.info(
+                    f"[{task_id}] 角色注入完成: graph_id={graph_id}, 角色={len(episodes)}, "
+                    f"节点={node_count}, 边={edge_count}"
+                )
+                task_manager.update_task(
+                    task_id,
+                    status=TaskStatus.COMPLETED,
+                    progress=100,
+                    message=t('progress.enrichComplete', count=len(episodes)),
+                    result={
+                        "graph_id": graph_id,
+                        "added_characters": len(episodes),
+                        "node_count": node_count,
+                        "edge_count": edge_count,
+                    }
+                )
+            except Exception as e:
+                enrich_logger.error(f"[{task_id}] 角色注入失败: {str(e)}")
+                enrich_logger.debug(traceback.format_exc())
+                task_manager.update_task(
+                    task_id,
+                    status=TaskStatus.FAILED,
+                    message=t('progress.enrichFailed', error=str(e)),
+                    error=traceback.format_exc()
+                )
+
+        thread = threading.Thread(target=enrich_task, daemon=True)
+        thread.start()
+
+        return jsonify({
+            "success": True,
+            "data": {"task_id": task_id, "graph_id": graph_id, "count": len(episodes)}
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 # ============== 任务查询接口 ==============
 
 @graph_bp.route('/task/<task_id>', methods=['GET'])

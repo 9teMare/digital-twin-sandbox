@@ -53,7 +53,8 @@ def create_character():
     """创建角色"""
     try:
         data = request.get_json() or {}
-        if not (data.get('name') or '').strip():
+        # 名称可选：缺省时用 UID 兜底（交易所数据通常只有 uid）
+        if not (data.get('name') or '').strip() and not str(data.get('uid') or '').strip():
             return jsonify({"success": False, "error": t('characters.errNameRequired')}), 400
         character = CharacterManager.create_character(data)
         return jsonify({"success": True, "data": character})

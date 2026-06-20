@@ -25,34 +25,26 @@ def _slug(name: str) -> str:
     return s or 'user'
 
 
-def _normalize_gender(gender: Any) -> str:
-    if not gender:
-        return "other"
-    g = str(gender).strip().lower()
-    mapping = {
-        "男": "male", "女": "female",
-        "m": "male", "f": "female",
-        "male": "male", "female": "female", "other": "other",
-    }
-    return mapping.get(g, "other")
-
-
-def _coerce_age(value: Any) -> int:
-    try:
-        return int(float(value))
-    except (TypeError, ValueError):
-        return 30
-
-
 def character_to_profile(character: Dict[str, Any], user_id: int) -> OasisAgentProfile:
-    """把单个角色字典转换为 OASIS Agent Profile（user_id 按名单顺序分配）。"""
+    """把单个角色字典转换为 OASIS Agent Profile（user_id 按名单顺序分配）。
+
+    交易所用户数据没有姓名/年龄/性别：
+    - name 用 uid 兜底
+    - country 取二级区域(region)
+    - profession 取主要交易产品(main_product)
+    - 兴趣话题取偏好资产，缺省回退到主要交易币种(main_coin)
+    """
     persona = Character.from_dict(character).compose_persona()
     bio = character.get("bio") or (persona[:150] if persona else character.get("name", ""))
+
     topics = character.get("preferred_assets") or []
     if isinstance(topics, str):
         topics = [t.strip() for t in topics.split(",") if t.strip()]
+    if not topics and character.get("main_coin"):
+        topics = [character["main_coin"]]
 
-    name = character.get("name") or f"User {user_id}"
+    uid = character.get("uid")
+    name = character.get("name") or (f"User {uid}" if uid not in (None, "") else f"User {user_id}")
 
     return OasisAgentProfile(
         user_id=user_id,
@@ -60,11 +52,8 @@ def character_to_profile(character: Dict[str, Any], user_id: int) -> OasisAgentP
         name=name,
         bio=bio,
         persona=persona or bio or name,
-        age=_coerce_age(character.get("age")),
-        gender=_normalize_gender(character.get("gender")),
-        mbti=character.get("mbti") or None,
-        country=character.get("jurisdiction") or None,
-        profession=character.get("occupation") or None,
+        country=character.get("region") or None,
+        profession=character.get("main_product") or None,
         interested_topics=topics,
         source_entity_uuid=character.get("character_id"),
         source_entity_type=ROSTER_ENTITY_TYPE,
@@ -81,19 +70,23 @@ def character_to_entity_node(character: Dict[str, Any]) -> EntityNode:
     persona = Character.from_dict(character).compose_persona()
 
     attr_keys = [
-        "risk_type", "purpose", "experience_level", "occupation", "jurisdiction",
-        "holding_style", "trading_frequency", "leverage_usage", "avg_position_size",
-        "sentiment_bias", "fomo_susceptibility", "source_of_income",
-        "income_band", "net_worth_band",
+        "region", "user_source", "registered_at", "vip_level",
+        "main_product", "main_coin", "positions",
+        "orders_30d", "orders_90d", "volume_30d", "volume_90d",
+        "fees_30d", "fees_90d", "activities_90d", "rewards_claimed",
+        "risk_type",
     ]
     attributes: Dict[str, Any] = {}
     for k in attr_keys:
         v = character.get(k)
-        if v:
+        if v not in (None, "", []):
             attributes[k] = v
     assets = character.get("preferred_assets") or []
     if assets:
         attributes["preferred_assets"] = ", ".join(assets) if isinstance(assets, list) else str(assets)
+    activity_ids = character.get("activity_ids") or []
+    if activity_ids:
+        attributes["activity_ids"] = ", ".join(map(str, activity_ids)) if isinstance(activity_ids, list) else str(activity_ids)
 
     return EntityNode(
         uuid=character.get("character_id") or _slug(character.get("name", "")),
@@ -106,3 +99,63 @@ def character_to_entity_node(character: Dict[str, Any]) -> EntityNode:
 
 def build_entity_nodes_from_characters(characters: List[Dict[str, Any]]) -> List[EntityNode]:
     return [character_to_entity_node(c) for c in characters]
+
+
+def character_to_episode_text(character: Dict[str, Any]) -> str:
+    """把单个角色序列化为适合 Zep 抽取的自然语言 episode 文本。
+
+    用于"图谱增强"：把用户挑选进本次模拟的角色注入到已构建的图谱（GraphRAG）中，
+    使其成为知识图谱的一部分，并与种子场景中的实体建立关联。
+
+    文本同时包含：
+    - 可读人设（compose_persona）
+    - 结构化的关键交易指标（便于 Zep 抽取实体属性）
+    """
+    char = Character.from_dict(character)
+    name = char.name
+    uid = character.get("uid")
+    persona = char.compose_persona()
+
+    header = f"Crypto exchange user {name}"
+    if uid not in (None, ""):
+        header += f" (UID {uid})"
+    header += " is one of the participants in this simulation scenario."
+
+    lines: List[str] = [header]
+    if persona:
+        lines.append(persona)
+
+    facts: List[str] = []
+
+    def add(label: str, value: Any) -> None:
+        if value not in (None, "", []):
+            facts.append(f"{label}: {value}")
+
+    add("Region", character.get("region"))
+    add("Registration source", character.get("user_source"))
+    add("Registered at", character.get("registered_at"))
+    add("VIP level", character.get("vip_level"))
+    add("Main trading product", character.get("main_product"))
+    add("Main trading coin", character.get("main_coin"))
+    add("Open positions", character.get("positions"))
+    add("Orders in last 30 days", character.get("orders_30d"))
+    add("Orders in last 90 days", character.get("orders_90d"))
+    add("Trading volume in last 30 days", character.get("volume_30d"))
+    add("Trading volume in last 90 days", character.get("volume_90d"))
+    add("Trading fees in last 30 days", character.get("fees_30d"))
+    add("Trading fees in last 90 days", character.get("fees_90d"))
+    add("Activities joined in last 90 days", character.get("activities_90d"))
+    add("Rewards claimed", character.get("rewards_claimed"))
+    assets = character.get("preferred_assets") or []
+    if assets:
+        add("Preferred assets", ", ".join(assets) if isinstance(assets, list) else str(assets))
+    add("Risk type", character.get("risk_type"))
+
+    if facts:
+        lines.append("Key profile facts — " + "; ".join(facts) + ".")
+
+    return "\n".join(lines)
+
+
+def build_episode_texts_from_characters(characters: List[Dict[str, Any]]) -> List[str]:
+    return [character_to_episode_text(c) for c in characters]
