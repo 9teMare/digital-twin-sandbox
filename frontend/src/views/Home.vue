@@ -19,6 +19,7 @@
           <LanguageSwitcher />
         </div>
         <router-link to="/characters" class="nav-link-btn">{{ $t('characters.navLink') }}</router-link>
+        <router-link to="/user-agent-creation" class="nav-link-btn">{{ $t('home.userAgentCreationNav') }}</router-link>
         <a href="https://github.com/9teMare/digital-twin-sandbox" target="_blank" class="github-link">
           {{ $t('nav.visitGithub') }} <span class="arrow">↗</span>
         </a>
@@ -231,6 +232,10 @@
                 <span v-else>{{ $t('home.initializing') }}</span>
                 <span class="btn-arrow">→</span>
               </button>
+              <router-link to="/user-agent-creation" class="user-agent-btn">
+                <span>{{ $t('home.userAgentCreationBtn') }}</span>
+                <span class="btn-arrow">→</span>
+              </router-link>
             </div>
           </div>
         </div>
@@ -881,6 +886,9 @@ const startSimulation = () => {
 
 .console-section.btn-section {
   padding-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .console-header {
@@ -1087,6 +1095,35 @@ const startSimulation = () => {
   cursor: not-allowed;
   transform: none;
   border-color: var(--border);
+}
+
+.user-agent-btn {
+  width: 100%;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 16px 20px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.95rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+}
+
+.user-agent-btn:hover {
+  background: rgba(109, 91, 255, 0.1);
+  border-color: rgba(109, 91, 255, 0.45);
+  transform: translateY(-1px);
+}
+
+.user-agent-btn:hover .btn-arrow {
+  transform: translateX(6px);
 }
 
 .btn-arrow {

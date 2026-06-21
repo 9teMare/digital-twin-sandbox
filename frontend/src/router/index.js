@@ -6,6 +6,7 @@ import SimulationRunView from '../views/SimulationRunView.vue'
 import ReportView from '../views/ReportView.vue'
 import InteractionView from '../views/InteractionView.vue'
 import CharactersView from '../views/CharactersView.vue'
+import UserAgentCreationView from '../views/UserAgentCreationView.vue'
 
 const routes = [
   {
@@ -47,6 +48,11 @@ const routes = [
     path: '/characters',
     name: 'Characters',
     component: CharactersView
+  },
+  {
+    path: '/user-agent-creation',
+    name: 'UserAgentCreation',
+    component: UserAgentCreationView
   }
 ]
 
