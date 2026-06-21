@@ -43,7 +43,8 @@ primary_region = "sin"
     timeout = "5s"
     grace_period = "60s"
 
-# Simulations (camel-oasis + LLM calls) are CPU/RAM heavy — bump if needed.
+# Simulations (camel-oasis + LLM calls) are CPU/RAM heavy.
 [[vm]]
-  size = "shared-cpu-2x"
-  memory = "2gb"
+  size = "performance-2x"
+  cpu_kind = "performance"
+  memory = "4gb"

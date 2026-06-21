@@ -284,7 +284,8 @@ class IPCHandler:
             results = {}
             for agent_id in agent_prompts.keys():
                 result = self._get_interview_result(agent_id)
-                results[agent_id] = result
+                result["platform"] = "twitter"
+                results[f"twitter_{agent_id}"] = result
             
             self.send_response(command_id, "completed", result={
                 "interviews_count": len(results),

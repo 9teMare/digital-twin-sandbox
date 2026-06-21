@@ -1362,25 +1362,22 @@ class ZepToolsService:
         )
         optimized_prompt = f"{INTERVIEW_PROMPT_PREFIX}{combined_prompt}"
         
-        # Step 4: 调用真实的采访API（不指定platform，默认双平台同时采访）
+        # Step 4: 调用真实的采访API（Twitter 平台）
         try:
-            # 构建批量采访列表（不指定platform，双平台采访）
             interviews_request = []
             for agent_idx in selected_indices:
                 interviews_request.append({
                     "agent_id": agent_idx,
-                    "prompt": optimized_prompt  # 使用优化后的prompt
-                    # 不指定platform，API会在twitter和reddit两个平台都采访
+                    "prompt": optimized_prompt,
                 })
             
             logger.info(t("console.callingBatchInterviewApi", count=len(interviews_request)))
             
-            # 调用 SimulationRunner 的批量采访方法（不传platform，双平台采访）
             api_result = SimulationRunner.interview_agents_batch(
                 simulation_id=simulation_id,
                 interviews=interviews_request,
-                platform=None,  # 不指定platform，双平台采访
-                timeout=180.0   # 双平台需要更长超时
+                platform="twitter",
+                timeout=180.0
             )
             
             logger.info(t("console.interviewApiReturned", count=api_result.get('interviews_count', 0), success=api_result.get('success')))
@@ -1393,7 +1390,6 @@ class ZepToolsService:
                 return result
             
             # Step 5: 解析API返回结果，构建AgentInterview对象
-            # 双平台模式返回格式: {"twitter_0": {...}, "reddit_0": {...}, "twitter_1": {...}, ...}
             api_data = api_result.get("result", {})
             results_dict = api_data.get("results", {}) if isinstance(api_data, dict) else {}
             
@@ -1403,25 +1399,18 @@ class ZepToolsService:
                 agent_role = agent.get("profession", "未知")
                 agent_bio = agent.get("bio", "")
                 
-                # 获取该Agent在两个平台的采访结果
-                twitter_result = results_dict.get(f"twitter_{agent_idx}", {})
-                reddit_result = results_dict.get(f"reddit_{agent_idx}", {})
-                
-                twitter_response = twitter_result.get("response", "")
-                reddit_response = reddit_result.get("response", "")
+                twitter_result = (
+                    results_dict.get(f"twitter_{agent_idx}")
+                    or results_dict.get(str(agent_idx))
+                    or results_dict.get(agent_idx, {})
+                )
+                twitter_response = twitter_result.get("response", "") if isinstance(twitter_result, dict) else ""
 
-                # 清理可能的工具调用 JSON 包裹
                 twitter_response = self._clean_tool_call_response(twitter_response)
-                reddit_response = self._clean_tool_call_response(reddit_response)
+                response_text = twitter_response if twitter_response else "（未获得回复）"
 
-                # 始终输出双平台标记
-                twitter_text = twitter_response if twitter_response else "（该平台未获得回复）"
-                reddit_text = reddit_response if reddit_response else "（该平台未获得回复）"
-                response_text = f"【Twitter平台回答】\n{twitter_text}\n\n【Reddit平台回答】\n{reddit_text}"
-
-                # 提取关键引言（从两个平台的回答中）
                 import re
-                combined_responses = f"{twitter_response} {reddit_response}"
+                combined_responses = twitter_response
 
                 # 清理响应文本：去掉标记、编号、Markdown 等干扰
                 clean_text = re.sub(r'#{1,6}\s+', '', combined_responses)
@@ -1459,6 +1448,13 @@ class ZepToolsService:
             
             result.interviewed_count = len(result.interviews)
             
+        except TimeoutError as e:
+            logger.error(t("console.interviewApiCallException", error=e))
+            result.summary = (
+                "采访超时：模拟进程未响应。"
+                "请重新运行模拟（服务器重启后 OASIS 环境会关闭，需重新启动模拟再采访）。"
+            )
+            return result
         except ValueError as e:
             # 模拟环境未运行
             logger.warning(t("console.interviewApiCallFailed", error=e))

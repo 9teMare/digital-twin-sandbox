@@ -312,7 +312,34 @@ class SimulationRunner:
             state.error = state.error or "Simulation process exited unexpectedly"
             state.twitter_running = False
             state.reddit_running = False
+            cls._mark_env_stopped(state.simulation_id)
             cls._save_run_state(state)
+    
+    @classmethod
+    def _is_process_alive(cls, pid: Optional[int]) -> bool:
+        if not pid:
+            return False
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+    
+    @classmethod
+    def _mark_env_stopped(cls, simulation_id: str):
+        """Mark OASIS wait-mode environment as stopped (interviews unavailable)."""
+        sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
+        status_file = os.path.join(sim_dir, "env_status.json")
+        try:
+            with open(status_file, 'w', encoding='utf-8') as f:
+                json.dump({
+                    "status": "stopped",
+                    "timestamp": datetime.now().isoformat()
+                }, f, ensure_ascii=False, indent=2)
+        except OSError:
+            pass
     
     @classmethod
     def _load_run_state(cls, simulation_id: str) -> Optional[SimulationRunState]:
@@ -1306,6 +1333,8 @@ class SimulationRunner:
                         except Exception:
                             process.kill()
                     
+                    cls._mark_env_stopped(simulation_id)
+                    
                     # 更新 run_state.json
                     state = cls.get_run_state(simulation_id)
                     if state:
@@ -1462,7 +1491,30 @@ class SimulationRunner:
             return False
 
         ipc_client = SimulationIPCClient(sim_dir)
-        return ipc_client.check_env_alive()
+        if not ipc_client.check_env_alive():
+            return False
+
+        process = cls._processes.get(simulation_id)
+        if process is not None:
+            if process.poll() is None:
+                return True
+            cls._mark_env_stopped(simulation_id)
+            return False
+
+        pid = None
+        run_state_file = os.path.join(sim_dir, "run_state.json")
+        if os.path.exists(run_state_file):
+            try:
+                with open(run_state_file, 'r', encoding='utf-8') as f:
+                    pid = json.load(f).get("process_pid")
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        if cls._is_process_alive(pid):
+            return True
+
+        cls._mark_env_stopped(simulation_id)
+        return False
 
     @classmethod
     def get_env_status_detail(cls, simulation_id: str) -> Dict[str, Any]:
@@ -1535,8 +1587,11 @@ class SimulationRunner:
 
         ipc_client = SimulationIPCClient(sim_dir)
 
-        if not ipc_client.check_env_alive():
-            raise ValueError(f"模拟环境未运行或已关闭，无法执行Interview: {simulation_id}")
+        if not cls.check_env_alive(simulation_id):
+            raise ValueError(
+                f"模拟环境未运行或已关闭，无法执行Interview: {simulation_id}。"
+                f"请重新运行模拟并保持进程存活（服务器重启后需重新启动模拟）。"
+            )
 
         logger.info(f"发送Interview命令: simulation_id={simulation_id}, agent_id={agent_id}, platform={platform}")
 
@@ -1597,8 +1652,11 @@ class SimulationRunner:
 
         ipc_client = SimulationIPCClient(sim_dir)
 
-        if not ipc_client.check_env_alive():
-            raise ValueError(f"模拟环境未运行或已关闭，无法执行Interview: {simulation_id}")
+        if not cls.check_env_alive(simulation_id):
+            raise ValueError(
+                f"模拟环境未运行或已关闭，无法执行Interview: {simulation_id}。"
+                f"请重新运行模拟并保持进程存活（服务器重启后需重新启动模拟）。"
+            )
 
         logger.info(f"发送批量Interview命令: simulation_id={simulation_id}, count={len(interviews)}, platform={platform}")
 
