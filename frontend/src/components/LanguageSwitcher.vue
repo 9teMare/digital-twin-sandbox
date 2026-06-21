@@ -62,22 +62,29 @@ onUnmounted(() => {
 <style scoped>
 .language-switcher {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
   font-family: 'JetBrains Mono', monospace;
 }
 
 .switcher-trigger {
+  box-sizing: border-box;
+  height: var(--header-control-height, 32px);
+  margin: 0;
   background: transparent;
   color: var(--text-body);
   border: 1px solid var(--border-strong);
-  padding: 4px 12px;
+  padding: 0 12px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.8rem;
+  line-height: 1;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  border-radius: 6px;
+  border-radius: var(--header-control-radius, 6px);
   transition: border-color 0.2s, color 0.2s, opacity 0.2s;
 }
 

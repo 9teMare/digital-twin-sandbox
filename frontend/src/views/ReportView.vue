@@ -3,7 +3,10 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-left">
-        <div class="brand" @click="router.push('/')">DIGITAL TWIN AGENT SANDBOX</div>
+        <div class="brand" @click="router.push('/')">
+          <AppLogo size="sm" />
+          <span>DIGITAL TWIN AGENT SANDBOX</span>
+        </div>
       </div>
       
       <div class="header-center">
@@ -21,8 +24,10 @@
       </div>
 
       <div class="header-right">
-        <ThemeSwitcher />
-        <LanguageSwitcher />
+        <div class="header-controls">
+          <ThemeSwitcher />
+          <LanguageSwitcher />
+        </div>
         <div class="step-divider"></div>
         <div class="workflow-step">
           <span class="step-num">Step 4/5</span>
@@ -73,6 +78,7 @@ import Step4Report from '../components/Step4Report.vue'
 import { getProject, getGraphData } from '../api/graph'
 import { getSimulation } from '../api/simulation'
 import { getReport } from '../api/report'
+import AppLogo from '../components/AppLogo.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 

@@ -49,7 +49,7 @@ class SimulationState:
     
     # 平台启用状态
     enable_twitter: bool = True
-    enable_reddit: bool = True
+    enable_reddit: bool = False
     
     # 状态
     status: SimulationStatus = SimulationStatus.CREATED
@@ -178,7 +178,7 @@ class SimulationManager:
             project_id=data.get("project_id", ""),
             graph_id=data.get("graph_id", ""),
             enable_twitter=data.get("enable_twitter", True),
-            enable_reddit=data.get("enable_reddit", True),
+            enable_reddit=data.get("enable_reddit", False),
             status=SimulationStatus(data.get("status", "created")),
             entities_count=data.get("entities_count", 0),
             profiles_count=data.get("profiles_count", 0),
@@ -202,7 +202,7 @@ class SimulationManager:
         project_id: str,
         graph_id: str,
         enable_twitter: bool = True,
-        enable_reddit: bool = True,
+        enable_reddit: bool = False,
     ) -> SimulationState:
         """
         创建新的模拟
@@ -405,13 +405,13 @@ class SimulationManager:
 
                 # 设置实时保存的文件路径（优先使用 Reddit JSON 格式）
                 realtime_output_path = None
-                realtime_platform = "reddit"
-                if state.enable_reddit:
-                    realtime_output_path = os.path.join(sim_dir, "reddit_profiles.json")
-                    realtime_platform = "reddit"
-                elif state.enable_twitter:
+                realtime_platform = "twitter"
+                if state.enable_twitter:
                     realtime_output_path = os.path.join(sim_dir, "twitter_profiles.csv")
                     realtime_platform = "twitter"
+                elif state.enable_reddit:
+                    realtime_output_path = os.path.join(sim_dir, "reddit_profiles.json")
+                    realtime_platform = "reddit"
 
                 profiles = generator.generate_profiles_from_entities(
                     entities=filtered.entities,
@@ -555,7 +555,7 @@ class SimulationManager:
         
         return simulations
     
-    def get_profiles(self, simulation_id: str, platform: str = "reddit") -> List[Dict[str, Any]]:
+    def get_profiles(self, simulation_id: str, platform: str = "twitter") -> List[Dict[str, Any]]:
         """获取模拟的Agent Profile"""
         state = self._load_simulation_state(simulation_id)
         if not state:

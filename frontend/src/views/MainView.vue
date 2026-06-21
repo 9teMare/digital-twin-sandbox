@@ -3,7 +3,10 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-left">
-        <div class="brand" @click="router.push('/')">DIGITAL TWIN AGENT SANDBOX</div>
+        <div class="brand" @click="router.push('/')">
+          <AppLogo size="sm" />
+          <span>DIGITAL TWIN AGENT SANDBOX</span>
+        </div>
       </div>
       
       <div class="header-center">
@@ -21,8 +24,10 @@
       </div>
 
       <div class="header-right">
-        <ThemeSwitcher />
-        <LanguageSwitcher />
+        <div class="header-controls">
+          <ThemeSwitcher />
+          <LanguageSwitcher />
+        </div>
         <div class="step-divider"></div>
         <div class="workflow-step">
           <span class="step-num">Step {{ currentStep }}/5</span>
@@ -86,6 +91,7 @@ import Step1GraphBuild from '../components/Step1GraphBuild.vue'
 import Step2EnvSetup from '../components/Step2EnvSetup.vue'
 import { generateOntology, getProject, buildGraph, getTaskStatus, getGraphData } from '../api/graph'
 import { getPendingUpload, clearPendingUpload } from '../store/pendingUpload'
+import AppLogo from '../components/AppLogo.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
@@ -441,6 +447,9 @@ onUnmounted(() => {
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-family: 'JetBrains Mono', monospace;
   font-weight: 800;
   font-size: 18px;

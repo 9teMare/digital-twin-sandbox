@@ -25,14 +25,41 @@ def _slug(name: str) -> str:
     return s or 'user'
 
 
+def _infer_trading_style(character: Dict[str, Any]) -> str:
+    product = (character.get("main_product") or "").lower()
+    if any(k in product for k in ("future", "perp", "derivative", "合约")):
+        return "day_trader"
+    if any(k in product for k in ("spot", "现货")):
+        return "swing"
+    if any(k in product for k in ("earn", "saving", "理财")):
+        return "yield_farmer"
+    orders = character.get("orders_30d") or 0
+    if orders and orders >= 100:
+        return "day_trader"
+    return "swing"
+
+
+def _infer_experience_level(character: Dict[str, Any]) -> str:
+    volume = character.get("volume_90d") or 0
+    orders = character.get("orders_90d") or 0
+    vip = character.get("vip_level") or 0
+    if volume >= 1_000_000 or orders >= 500 or vip >= 5:
+        return "whale"
+    if volume >= 100_000 or orders >= 50 or vip >= 2:
+        return "advanced"
+    if volume >= 10_000 or orders >= 10:
+        return "intermediate"
+    return "beginner"
+
+
 def character_to_profile(character: Dict[str, Any], user_id: int) -> OasisAgentProfile:
     """把单个角色字典转换为 OASIS Agent Profile（user_id 按名单顺序分配）。
 
-    交易所用户数据没有姓名/年龄/性别：
+    交易所用户数据以交易行为为主：
     - name 用 uid 兜底
-    - country 取二级区域(region)
     - profession 取主要交易产品(main_product)
     - 兴趣话题取偏好资产，缺省回退到主要交易币种(main_coin)
+    - 使用 risk_type / 推断的交易风格与经验层级，而非年龄/MBTI 等人口统计字段
     """
     persona = Character.from_dict(character).compose_persona()
     bio = character.get("bio") or (persona[:150] if persona else character.get("name", ""))
@@ -52,9 +79,11 @@ def character_to_profile(character: Dict[str, Any], user_id: int) -> OasisAgentP
         name=name,
         bio=bio,
         persona=persona or bio or name,
-        country=character.get("region") or None,
         profession=character.get("main_product") or None,
         interested_topics=topics,
+        risk_tolerance=character.get("risk_type") or "moderate",
+        trading_style=_infer_trading_style(character),
+        experience_level=_infer_experience_level(character),
         source_entity_uuid=character.get("character_id"),
         source_entity_type=ROSTER_ENTITY_TYPE,
     )
@@ -70,7 +99,7 @@ def character_to_entity_node(character: Dict[str, Any]) -> EntityNode:
     persona = Character.from_dict(character).compose_persona()
 
     attr_keys = [
-        "region", "user_source", "registered_at", "vip_level",
+        "user_source", "registered_at", "vip_level",
         "main_product", "main_coin", "positions",
         "orders_30d", "orders_90d", "volume_30d", "volume_90d",
         "fees_30d", "fees_90d", "activities_90d", "rewards_claimed",
@@ -131,7 +160,7 @@ def character_to_episode_text(character: Dict[str, Any]) -> str:
         if value not in (None, "", []):
             facts.append(f"{label}: {value}")
 
-    add("Region", character.get("region"))
+    # 刻意不写入 Region/国籍，避免把身份属性注入 Zep 图谱
     add("Registration source", character.get("user_source"))
     add("Registered at", character.get("registered_at"))
     add("VIP level", character.get("vip_level"))

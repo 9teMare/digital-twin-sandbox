@@ -174,6 +174,50 @@ except ImportError as e:
     sys.exit(1)
 
 
+# ---- 隐藏 OASIS 默认人口统计提示（年龄 / 性别 / MBTI / 国籍），产品改用交易画像 ----
+# OASIS 默认会在 Reddit 系统消息中追加：
+#   "You are a {gender}, {age} years old, with an MBTI personality type of {mbti} from {country}."
+# 本项目以"交易行为"驱动 Agent，不希望这些身份属性影响或泄露给 LLM，
+# 因此覆写该方法，仅保留姓名与人设(persona)，去掉人口统计学句子。
+def _patch_oasis_hide_demographics():
+    try:
+        from oasis.social_platform.config.user import UserInfo as _UserInfo
+    except Exception as err:  # pragma: no cover - 依赖缺失时跳过
+        print(f"警告: 无法导入 UserInfo，跳过身份属性隐藏补丁: {err}")
+        return
+
+    def _to_reddit_system_message_no_demographics(self) -> str:
+        name_string = ""
+        description = ""
+        if self.name is not None:
+            name_string = f"Your name is {self.name}."
+            description = name_string
+        if (self.profile
+                and "other_info" in self.profile
+                and "user_profile" in self.profile["other_info"]
+                and self.profile["other_info"]["user_profile"] is not None):
+            user_profile = self.profile["other_info"]["user_profile"]
+            description = f"{name_string}\nYour have profile: {user_profile}."
+
+        return f"""
+# OBJECTIVE
+You're a Reddit user, and I'll present you with some tweets. After you see the tweets, choose some actions from the following functions.
+
+# SELF-DESCRIPTION
+Your actions should be consistent with your self-description and personality.
+{description}
+
+# RESPONSE METHOD
+Please perform actions by tool calling.
+"""
+
+    _UserInfo.to_reddit_system_message = _to_reddit_system_message_no_demographics
+    print("已应用身份属性隐藏补丁：Reddit Agent 系统提示不再包含国籍/MBTI/年龄/性别")
+
+
+_patch_oasis_hide_demographics()
+
+
 # Twitter可用动作（不包含INTERVIEW，INTERVIEW只能通过ManualAction手动触发）
 TWITTER_ACTIONS = [
     ActionType.CREATE_POST,

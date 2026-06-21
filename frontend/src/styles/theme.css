@@ -67,6 +67,11 @@
   --scrollbar-track: #f1f1f1;
   --scrollbar-thumb: #cfcfd8;
   --scrollbar-thumb-hover: #6d5bff;
+
+  /* header utility controls (theme / language toggles) */
+  --header-control-height: 32px;
+  --header-control-radius: 6px;
+  --header-control-gap: 8px;
 }
 
 :root[data-theme='dark'] {
@@ -137,6 +142,20 @@ body {
 
 body {
   transition: background-color 0.3s ease;
+}
+
+.header-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--header-control-gap, 8px);
+  flex-shrink: 0;
+}
+
+.nav-brand,
+.app-header .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 /* Scrollbars follow the theme */

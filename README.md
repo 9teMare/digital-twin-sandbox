@@ -87,7 +87,7 @@ Click the image to watch MiroFish's deep prediction of the lost ending based on 
 
 1. **Graph Building**: Seed extraction & Individual/collective memory injection & GraphRAG construction
 2. **Environment Setup**: Entity relationship extraction & Persona generation & Agent configuration injection
-3. **Simulation**: Dual-platform parallel simulation & Auto-parse prediction requirements & Dynamic temporal memory updates
+3. **Simulation**: Twitter simulation & auto-parse prediction requirements & dynamic temporal memory updates
 4. **Report Generation**: ReportAgent with rich toolset for deep interaction with post-simulation environment
 5. **Deep Interaction**: Chat with any agent in the simulated world & Interact with ReportAgent
 

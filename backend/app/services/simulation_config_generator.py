@@ -249,7 +249,7 @@ class SimulationConfigGenerator:
         document_text: str,
         entities: List[EntityNode],
         enable_twitter: bool = True,
-        enable_reddit: bool = True,
+        enable_reddit: bool = False,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
     ) -> SimulationParameters:
         """

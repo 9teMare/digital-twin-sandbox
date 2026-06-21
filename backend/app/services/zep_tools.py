@@ -1515,18 +1515,7 @@ class ZepToolsService:
         
         profiles = []
         
-        # 优先尝试读取Reddit JSON格式
-        reddit_profile_path = os.path.join(sim_dir, "reddit_profiles.json")
-        if os.path.exists(reddit_profile_path):
-            try:
-                with open(reddit_profile_path, 'r', encoding='utf-8') as f:
-                    profiles = json.load(f)
-                logger.info(t("console.loadedRedditProfiles", count=len(profiles)))
-                return profiles
-            except Exception as e:
-                logger.warning(t("console.readRedditProfilesFailed", error=e))
-        
-        # 尝试读取Twitter CSV格式
+        # 读取 Twitter CSV 格式
         twitter_profile_path = os.path.join(sim_dir, "twitter_profiles.csv")
         if os.path.exists(twitter_profile_path):
             try:

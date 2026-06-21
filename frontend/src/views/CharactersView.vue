@@ -3,12 +3,17 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-left">
-        <div class="brand" @click="router.push('/')">DIGITAL TWIN AGENT SANDBOX</div>
+        <div class="brand" @click="router.push('/')">
+          <AppLogo size="sm" />
+          <span>DIGITAL TWIN AGENT SANDBOX</span>
+        </div>
         <span class="page-tag">{{ $t('characters.title') }}</span>
       </div>
       <div class="header-right">
-        <ThemeSwitcher />
-        <LanguageSwitcher />
+        <div class="header-controls">
+          <ThemeSwitcher />
+          <LanguageSwitcher />
+        </div>
       </div>
     </header>
 
@@ -51,7 +56,6 @@
         <thead>
           <tr>
             <th>{{ $t('characters.fName') }}</th>
-            <th>{{ $t('characters.fRegion') }}</th>
             <th>{{ $t('characters.fVipLevel') }}</th>
             <th>{{ $t('characters.fMainProduct') }}</th>
             <th>{{ $t('characters.fMainCoin') }}</th>
@@ -67,7 +71,6 @@
               {{ c.name }}
               <span v-if="c.uid" class="uid-tag">#{{ c.uid }}</span>
             </td>
-            <td>{{ c.region || '—' }}</td>
             <td><span v-if="c.vip_level != null" class="chip vip">VIP {{ c.vip_level }}</span><span v-else>—</span></td>
             <td>{{ c.main_product || '—' }}</td>
             <td><span v-if="c.main_coin" class="chip asset">{{ c.main_coin }}</span><span v-else>—</span></td>
@@ -109,13 +112,10 @@
               <div class="field"><label>{{ $t('characters.fName') }}</label><input v-model="form.name" :placeholder="$t('characters.nameHint')" /></div>
             </div>
             <div class="row2">
-              <div class="field"><label>{{ $t('characters.fRegion') }}</label><input v-model="form.region" /></div>
               <div class="field"><label>{{ $t('characters.fUserSource') }}</label><input v-model="form.user_source" /></div>
-            </div>
-            <div class="row2">
               <div class="field"><label>{{ $t('characters.fRegisteredAt') }}</label><input v-model="form.registered_at" :placeholder="$t('characters.dateHint')" /></div>
-              <div class="field"><label>{{ $t('characters.fVipLevel') }}</label><input v-model.number="form.vip_level" type="number" min="0" /></div>
             </div>
+            <div class="field"><label>{{ $t('characters.fVipLevel') }}</label><input v-model.number="form.vip_level" type="number" min="0" /></div>
           </fieldset>
 
           <fieldset>
@@ -210,6 +210,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import AppLogo from '../components/AppLogo.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 import {
@@ -417,6 +418,7 @@ onMounted(load)
   padding: 16px 28px; border-bottom: 1px solid var(--border);
 }
 .header-left { display: flex; align-items: center; gap: 14px; }
+.header-right { display: flex; align-items: center; gap: 16px; }
 .brand { font-weight: 700; letter-spacing: 0.5px; cursor: pointer; font-size: 15px; }
 .page-tag {
   font-family: 'JetBrains Mono', monospace; font-size: 12px;

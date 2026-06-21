@@ -160,12 +160,10 @@ class Character:
 
         parts: List[str] = []
 
-        # 身份：地区 + 主要产品 + VIP 等级 + 注册渠道/时间
+        # 身份：主要产品 + VIP 等级 + 注册渠道/时间
+        # 注意：刻意不包含国籍/地区等身份属性，避免将其喂给 LLM / Zep。
         product = self.main_product or "crypto"
-        intro = f"{self.name} is a"
-        if self.region:
-            intro += f" {self.region}"
-        intro += f" {product} trader on the exchange"
+        intro = f"{self.name} is a {product} trader on the exchange"
         if self.vip_level is not None:
             intro += f" (VIP level {self.vip_level})"
         if self.registered_at:
@@ -266,7 +264,7 @@ class CharacterManager:
             q = query.lower()
             def _match(it: Dict[str, Any]) -> bool:
                 haystack = " ".join(str(it.get(k, "")) for k in
-                                    ("name", "uid", "region", "main_product", "main_coin", "risk_type"))
+                                    ("name", "uid", "main_product", "main_coin", "risk_type", "user_source"))
                 haystack += " " + " ".join(it.get("preferred_assets") or [])
                 return q in haystack.lower()
             items = [it for it in items if _match(it)]

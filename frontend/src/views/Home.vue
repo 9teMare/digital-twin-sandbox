@@ -10,12 +10,14 @@
     <!-- 顶部导航栏 -->
     <nav class="navbar">
       <div class="nav-brand">
-        <span class="brand-mark">◈</span>
+        <AppLogo size="md" />
         <span class="brand-text">DIGITAL TWIN AGENT SANDBOX</span>
       </div>
       <div class="nav-links">
-        <ThemeSwitcher />
-        <LanguageSwitcher />
+        <div class="header-controls">
+          <ThemeSwitcher />
+          <LanguageSwitcher />
+        </div>
         <router-link to="/characters" class="nav-link-btn">{{ $t('characters.navLink') }}</router-link>
         <a href="https://github.com/9teMare/digital-twin-sandbox" target="_blank" class="github-link">
           {{ $t('nav.visitGithub') }} <span class="arrow">↗</span>
@@ -244,6 +246,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
+import AppLogo from '../components/AppLogo.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 import Cubes from '../components/Cubes.vue'
@@ -443,12 +446,6 @@ const startSimulation = () => {
   font-weight: 800;
   letter-spacing: 1px;
   font-size: 1.1rem;
-}
-
-.brand-mark {
-  color: var(--violet);
-  font-size: 1.1rem;
-  text-shadow: 0 0 14px rgba(109, 91, 255, 0.8);
 }
 
 .brand-text {

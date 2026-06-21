@@ -174,7 +174,7 @@ def create_simulation():
             "project_id": "proj_xxxx",      // 必填
             "graph_id": "digital_twin_agent_sandbox_xxxx",    // 可选，如不提供则从project获取
             "enable_twitter": true,          // 可选，默认true
-            "enable_reddit": true            // 可选，默认true
+            "enable_reddit": false           // 已弃用，仅保留 Twitter
         }
     
     返回：
@@ -220,7 +220,7 @@ def create_simulation():
             project_id=project_id,
             graph_id=graph_id,
             enable_twitter=data.get('enable_twitter', True),
-            enable_reddit=data.get('enable_reddit', True),
+            enable_reddit=data.get('enable_reddit', False),
         )
         
         return jsonify({
@@ -262,11 +262,10 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
     if not os.path.exists(simulation_dir):
         return False, {"reason": "模拟目录不存在"}
     
-    # 必要文件列表（不包括脚本，脚本位于 backend/scripts/）
+    # 必要文件列表（Twitter 模拟；reddit_profiles.json 已不再需要）
     required_files = [
         "state.json",
         "simulation_config.json",
-        "reddit_profiles.json",
         "twitter_profiles.csv"
     ]
     
@@ -311,14 +310,14 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
         prepared_statuses = ["ready", "preparing", "running", "completed", "stopped", "failed"]
         if status in prepared_statuses and config_generated:
             # 获取文件统计信息
-            profiles_file = os.path.join(simulation_dir, "reddit_profiles.json")
+            profiles_file = os.path.join(simulation_dir, "twitter_profiles.csv")
             config_file = os.path.join(simulation_dir, "simulation_config.json")
             
             profiles_count = 0
             if os.path.exists(profiles_file):
+                import csv
                 with open(profiles_file, 'r', encoding='utf-8') as f:
-                    profiles_data = json.load(f)
-                    profiles_count = len(profiles_data) if isinstance(profiles_data, list) else 0
+                    profiles_count = max(0, sum(1 for _ in csv.reader(f)) - 1)
             
             # 如果状态是preparing但文件已完成，自动更新状态为ready
             if status == "preparing":
@@ -900,8 +899,8 @@ def get_simulation_history():
                 {
                     "simulation_id": "sim_xxxx",
                     "project_id": "proj_xxxx",
-                    "project_name": "武大舆情分析",
-                    "simulation_requirement": "如果武汉大学发布...",
+                    "project_name": "Bitcoin Pizza Day",
+                    "simulation_requirement": "What kind of campaign would be most effective to promote Bitcoin Pizza Day?",
                     "status": "completed",
                     "entities_count": 68,
                     "profiles_count": 68,
@@ -1006,7 +1005,7 @@ def get_simulation_profiles(simulation_id: str):
         platform: 平台类型（reddit/twitter，默认reddit）
     """
     try:
-        platform = request.args.get('platform', 'reddit')
+        platform = request.args.get('platform', 'twitter')
         
         manager = SimulationManager()
         profiles = manager.get_profiles(simulation_id, platform=platform)
@@ -1068,7 +1067,7 @@ def get_simulation_profiles_realtime(simulation_id: str):
     from datetime import datetime
     
     try:
-        platform = request.args.get('platform', 'reddit')
+        platform = request.args.get('platform', 'twitter')
         
         # 获取模拟目录
         sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
@@ -1409,7 +1408,7 @@ def generate_profiles():
         
         entity_types = data.get('entity_types')
         use_llm = data.get('use_llm', True)
-        platform = data.get('platform', 'reddit')
+        platform = data.get('platform', 'twitter')
         
         reader = ZepEntityReader()
         filtered = reader.filter_defined_entities(
@@ -1509,7 +1508,7 @@ def start_simulation():
                 "error": t('api.requireSimulationId')
             }), 400
 
-        platform = data.get('platform', 'parallel')
+        platform = data.get('platform', 'twitter')
         max_rounds = data.get('max_rounds')  # 可选：最大模拟轮数
         enable_graph_memory_update = data.get('enable_graph_memory_update', False)  # 可选：是否启用图谱记忆更新
         force = data.get('force', False)  # 可选：强制重新开始
@@ -2007,7 +2006,7 @@ def get_simulation_posts(simulation_id: str):
     返回帖子列表（从SQLite数据库读取）
     """
     try:
-        platform = request.args.get('platform', 'reddit')
+        platform = request.args.get('platform', 'twitter')
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         

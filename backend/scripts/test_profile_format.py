@@ -29,33 +29,35 @@ def test_profile_formats():
             user_id=0,
             user_name="test_user_123",
             name="Test User",
-            bio="A test user for validation",
-            persona="Test User is an enthusiastic participant in social discussions.",
+            bio="A test trader for validation",
+            persona="Test User is an active crypto trader who posts market views and reacts quickly to volatility.",
             karma=1500,
             friend_count=100,
             follower_count=200,
             statuses_count=500,
-            age=25,
-            gender="male",
-            mbti="INTJ",
-            country="China",
-            profession="Student",
-            interested_topics=["Technology", "Education"],
+            risk_tolerance="aggressive",
+            trading_style="day_trader",
+            experience_level="intermediate",
+            profession="Futures Trader",
+            interested_topics=["BTC", "ETH"],
             source_entity_uuid="test-uuid-123",
-            source_entity_type="Student",
+            source_entity_type="CryptoUser",
         ),
         OasisAgentProfile(
             user_id=1,
             user_name="org_official_456",
             name="Official Organization",
             bio="Official account for Organization",
-            persona="This is an official institutional account that communicates official positions.",
+            persona="This is an official institutional account that communicates market policy and compliance updates.",
             karma=5000,
             friend_count=50,
             follower_count=10000,
             statuses_count=200,
+            risk_tolerance="moderate",
+            trading_style="long_term",
+            experience_level="advanced",
             profession="Organization",
-            interested_topics=["Public Policy", "Announcements"],
+            interested_topics=["Policy", "Compliance"],
             source_entity_uuid="test-uuid-456",
             source_entity_type="University",
         ),
@@ -83,11 +85,11 @@ def test_profile_formats():
         print(f"   表头: {list(rows[0].keys())}")
         print(f"\n   示例数据 (第1行):")
         for key, value in rows[0].items():
-            print(f"     {key}: {value}")
+            preview = value[:80] + "..." if len(value) > 80 else value
+            print(f"     {key}: {preview}")
         
         # 验证必需字段
-        required_twitter_fields = ['user_id', 'user_name', 'name', 'bio', 
-                                   'friend_count', 'follower_count', 'statuses_count', 'created_at']
+        required_twitter_fields = ['user_id', 'name', 'username', 'user_char', 'description']
         missing = set(required_twitter_fields) - set(rows[0].keys())
         if missing:
             print(f"\n   [错误] 缺少字段: {missing}")
@@ -109,9 +111,11 @@ def test_profile_formats():
         print(f"\n   示例数据 (第1条):")
         print(json.dumps(reddit_data[0], ensure_ascii=False, indent=4))
         
-        # 验证详细格式字段
-        required_reddit_fields = ['realname', 'username', 'bio', 'persona']
-        optional_reddit_fields = ['age', 'gender', 'mbti', 'country', 'profession', 'interested_topics']
+        required_reddit_fields = ['user_id', 'username', 'name', 'bio', 'persona']
+        optional_reddit_fields = [
+            'risk_tolerance', 'trading_style', 'experience_level',
+            'profession', 'interested_topics'
+        ]
         
         missing = set(required_reddit_fields) - set(reddit_data[0].keys())
         if missing:
@@ -135,25 +139,23 @@ def show_expected_formats():
     
     print("\n1. Twitter Profile (CSV格式)")
     print("-" * 40)
-    twitter_example = """user_id,user_name,name,bio,friend_count,follower_count,statuses_count,created_at
-0,user0,User Zero,I am user zero with interests in technology.,100,150,500,2023-01-01
-1,user1,User One,Tech enthusiast and coffee lover.,200,250,1000,2023-01-02"""
+    twitter_example = """user_id,name,username,user_char,description,risk_tolerance,trading_style,experience_level
+0,User Zero,user0,I am user zero...,Short bio...,moderate,swing,intermediate"""
     print(twitter_example)
     
     print("\n2. Reddit Profile (JSON详细格式)")
     print("-" * 40)
     reddit_example = [
         {
-            "realname": "James Miller",
-            "username": "millerhospitality",
-            "bio": "Passionate about hospitality & tourism.",
-            "persona": "James is a seasoned professional in the Hospitality & Tourism industry...",
-            "age": 40,
-            "gender": "male",
-            "mbti": "ESTJ",
-            "country": "UK",
-            "profession": "Hospitality & Tourism",
-            "interested_topics": ["Economics", "Business"]
+            "username": "miller_trades",
+            "name": "James Miller",
+            "bio": "Passionate about crypto markets.",
+            "persona": "James is an active futures trader who posts macro views and reacts to volatility...",
+            "risk_tolerance": "aggressive",
+            "trading_style": "day_trader",
+            "experience_level": "advanced",
+            "profession": "Futures Trader",
+            "interested_topics": ["BTC", "Macro"]
         }
     ]
     print(json.dumps(reddit_example, ensure_ascii=False, indent=2))
@@ -162,5 +164,3 @@ def show_expected_formats():
 if __name__ == "__main__":
     test_profile_formats()
     show_expected_formats()
-
-

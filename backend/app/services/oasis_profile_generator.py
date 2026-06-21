@@ -44,11 +44,10 @@ class OasisAgentProfile:
     follower_count: int = 150
     statuses_count: int = 500
     
-    # 额外人设信息
-    age: Optional[int] = None
-    gender: Optional[str] = None
-    mbti: Optional[str] = None
-    country: Optional[str] = None
+    # 交易 / 行为画像（替代年龄、性别、MBTI 等人口统计字段）
+    risk_tolerance: Optional[str] = None       # conservative | moderate | aggressive | degen
+    trading_style: Optional[str] = None        # day_trader | swing | long_term | arbitrage | yield_farmer
+    experience_level: Optional[str] = None     # beginner | intermediate | advanced | whale
     profession: Optional[str] = None
     interested_topics: List[str] = field(default_factory=list)
     
@@ -57,64 +56,63 @@ class OasisAgentProfile:
     source_entity_type: Optional[str] = None
     
     created_at: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+
+    def _compose_user_char(self) -> str:
+        """合并 bio/persona 与交易画像，供 OASIS user_char 使用。"""
+        user_char = self.bio
+        if self.persona and self.persona != self.bio:
+            user_char = f"{self.bio} {self.persona}"
+        traits: List[str] = []
+        if self.risk_tolerance:
+            traits.append(f"Risk tolerance: {self.risk_tolerance}")
+        if self.trading_style:
+            traits.append(f"Trading style: {self.trading_style}")
+        if self.experience_level:
+            traits.append(f"Experience level: {self.experience_level}")
+        if traits:
+            user_char = f"{user_char} {'; '.join(traits)}"
+        return user_char.replace('\n', ' ').replace('\r', ' ')
+
+    def _append_trading_fields(self, profile: Dict[str, Any]) -> None:
+        if self.risk_tolerance:
+            profile["risk_tolerance"] = self.risk_tolerance
+        if self.trading_style:
+            profile["trading_style"] = self.trading_style
+        if self.experience_level:
+            profile["experience_level"] = self.experience_level
+        if self.profession:
+            profile["profession"] = self.profession
+        if self.interested_topics:
+            profile["interested_topics"] = self.interested_topics
     
     def to_reddit_format(self) -> Dict[str, Any]:
         """转换为Reddit平台格式"""
         profile = {
             "user_id": self.user_id,
-            "username": self.user_name,  # OASIS 库要求字段名为 username（无下划线）
+            "username": self.user_name,
             "name": self.name,
             "bio": self.bio,
             "persona": self.persona,
             "karma": self.karma,
             "created_at": self.created_at,
         }
-        
-        # 添加额外人设信息（如果有）
-        if self.age:
-            profile["age"] = self.age
-        if self.gender:
-            profile["gender"] = self.gender
-        if self.mbti:
-            profile["mbti"] = self.mbti
-        if self.country:
-            profile["country"] = self.country
-        if self.profession:
-            profile["profession"] = self.profession
-        if self.interested_topics:
-            profile["interested_topics"] = self.interested_topics
-        
+        self._append_trading_fields(profile)
         return profile
     
     def to_twitter_format(self) -> Dict[str, Any]:
-        """转换为Twitter平台格式"""
-        profile = {
-            "user_id": self.user_id,
-            "username": self.user_name,  # OASIS 库要求字段名为 username（无下划线）
+        """转换为 Twitter CSV 行（OASIS 格式 + 可选交易画像列）"""
+        return self.to_twitter_csv_row(self.user_id if self.user_id is not None else 0)
+
+    def to_twitter_csv_row(self, idx: int) -> Dict[str, Any]:
+        row: Dict[str, Any] = {
+            "user_id": idx,
             "name": self.name,
-            "bio": self.bio,
-            "persona": self.persona,
-            "friend_count": self.friend_count,
-            "follower_count": self.follower_count,
-            "statuses_count": self.statuses_count,
-            "created_at": self.created_at,
+            "username": self.user_name,
+            "user_char": self._compose_user_char(),
+            "description": self.bio.replace('\n', ' ').replace('\r', ' '),
         }
-        
-        # 添加额外人设信息
-        if self.age:
-            profile["age"] = self.age
-        if self.gender:
-            profile["gender"] = self.gender
-        if self.mbti:
-            profile["mbti"] = self.mbti
-        if self.country:
-            profile["country"] = self.country
-        if self.profession:
-            profile["profession"] = self.profession
-        if self.interested_topics:
-            profile["interested_topics"] = self.interested_topics
-        
-        return profile
+        self._append_trading_fields(row)
+        return row
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为完整字典格式"""
@@ -128,10 +126,9 @@ class OasisAgentProfile:
             "friend_count": self.friend_count,
             "follower_count": self.follower_count,
             "statuses_count": self.statuses_count,
-            "age": self.age,
-            "gender": self.gender,
-            "mbti": self.mbti,
-            "country": self.country,
+            "risk_tolerance": self.risk_tolerance,
+            "trading_style": self.trading_style,
+            "experience_level": self.experience_level,
             "profession": self.profession,
             "interested_topics": self.interested_topics,
             "source_entity_uuid": self.source_entity_uuid,
@@ -152,24 +149,16 @@ class OasisProfileGenerator:
     3. 区分个人实体和抽象群体实体
     """
     
-    # MBTI类型列表
-    MBTI_TYPES = [
-        "INTJ", "INTP", "ENTJ", "ENTP",
-        "INFJ", "INFP", "ENFJ", "ENFP",
-        "ISTJ", "ISFJ", "ESTJ", "ESFJ",
-        "ISTP", "ISFP", "ESTP", "ESFP"
-    ]
-    
-    # 常见国家列表
-    COUNTRIES = [
-        "China", "US", "UK", "Japan", "Germany", "France", 
-        "Canada", "Australia", "Brazil", "India", "South Korea"
-    ]
+    # 交易画像枚举（用于规则生成与 LLM 提示）
+    RISK_TOLERANCES = ["conservative", "moderate", "aggressive", "degen"]
+    TRADING_STYLES = ["day_trader", "swing", "long_term", "arbitrage", "yield_farmer"]
+    EXPERIENCE_LEVELS = ["beginner", "intermediate", "advanced", "whale"]
     
     # 个人类型实体（需要生成具体人设）
     INDIVIDUAL_ENTITY_TYPES = [
-        "student", "alumni", "professor", "person", "publicfigure", 
-        "expert", "faculty", "official", "journalist", "activist"
+        "student", "alumni", "professor", "person", "publicfigure",
+        "expert", "faculty", "official", "journalist", "activist",
+        "cryptouser",
     ]
     
     # 群体/机构类型实体（需要生成群体代表人设）
@@ -263,10 +252,9 @@ class OasisProfileGenerator:
             friend_count=profile_data.get("friend_count", random.randint(50, 500)),
             follower_count=profile_data.get("follower_count", random.randint(100, 1000)),
             statuses_count=profile_data.get("statuses_count", random.randint(100, 2000)),
-            age=profile_data.get("age"),
-            gender=profile_data.get("gender"),
-            mbti=profile_data.get("mbti"),
-            country=profile_data.get("country"),
+            risk_tolerance=profile_data.get("risk_tolerance"),
+            trading_style=profile_data.get("trading_style"),
+            experience_level=profile_data.get("experience_level"),
             profession=profile_data.get("profession"),
             interested_topics=profile_data.get("interested_topics", []),
             source_entity_uuid=entity.uuid,
@@ -671,7 +659,13 @@ class OasisProfileGenerator:
     
     def _get_system_prompt(self, is_individual: bool) -> str:
         """获取系统提示词"""
-        base_prompt = "你是社交媒体用户画像生成专家。生成详细、真实的人设用于舆论模拟,最大程度还原已有现实情况。必须返回有效的JSON格式，所有字符串值不能包含未转义的换行符。"
+        base_prompt = (
+            "你是加密货币交易所/社交媒体交易者画像生成专家。"
+            "生成详细、真实的交易行为与人设，用于舆论模拟，最大程度还原已有现实情况。"
+            "不要生成年龄、性别、MBTI、国籍等人口统计信息；"
+            "改用 risk_tolerance、trading_style、experience_level 等交易相关字段。"
+            "必须返回有效的JSON格式，所有字符串值不能包含未转义的换行符。"
+        )
         return f"{base_prompt}\n\n{get_language_instruction()}"
     
     def _build_individual_persona_prompt(
@@ -687,7 +681,7 @@ class OasisProfileGenerator:
         attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "无"
         context_str = context[:3000] if context else "无额外上下文"
         
-        return f"""为实体生成详细的社交媒体用户人设,最大程度还原已有现实情况。
+        return f"""为实体生成详细的加密货币/金融社交媒体交易者人设,最大程度还原已有现实情况。
 
 实体名称: {entity_name}
 实体类型: {entity_type}
@@ -701,26 +695,24 @@ class OasisProfileGenerator:
 
 1. bio: 社交媒体简介，200字
 2. persona: 详细人设描述（2000字的纯文本），需包含:
-   - 基本信息（年龄、职业、教育背景、所在地）
-   - 人物背景（重要经历、与事件的关联、社会关系）
-   - 性格特征（MBTI类型、核心性格、情绪表达方式）
-   - 社交媒体行为（发帖频率、内容偏好、互动风格、语言特点）
-   - 立场观点（对话题的态度、可能被激怒/感动的内容）
-   - 独特特征（口头禅、特殊经历、个人爱好）
-   - 个人记忆（人设的重要部分，要介绍这个个体与事件的关联，以及这个个体在事件中的已有动作与反应）
-3. age: 年龄数字（必须是整数）
-4. gender: 性别，必须是英文: "male" 或 "female"
-5. mbti: MBTI类型（如INTJ、ENFP等）
-6. country: 国家（使用中文，如"中国"）
-7. profession: 职业
-8. interested_topics: 感兴趣话题数组
+   - 交易背景（主要品种、持仓习惯、典型交易频率）
+   - 风险偏好与决策风格（止损/止盈习惯、杠杆使用、对波动的反应）
+   - 信息来源与社群行为（关注哪些 KOL/媒体、发帖与互动风格）
+   - 立场观点（对核心话题/市场事件的态度、容易被激怒或说服的内容）
+   - 独特特征（口头禅、标志性策略、典型失误或成功经验）
+   - 个人记忆（与事件的关联，以及在该事件中的已有动作与反应）
+3. risk_tolerance: 风险偏好，必须是以下之一: conservative, moderate, aggressive, degen
+4. trading_style: 交易风格，必须是以下之一: day_trader, swing, long_term, arbitrage, yield_farmer
+5. experience_level: 经验层级，必须是以下之一: beginner, intermediate, advanced, whale
+6. profession: 交易者角色/职能（如 spot trader, futures trader, researcher）
+7. interested_topics: 关注话题数组（如 BTC, ETH, macro, regulation）
 
 重要:
-- 所有字段值必须是字符串或数字，不要使用换行符
+- 所有字段值必须是字符串或数组，不要使用换行符
 - persona必须是一段连贯的文字描述
-- {get_language_instruction()} (gender字段必须用英文male/female)
+- 不要输出 age、gender、mbti、country 等人口统计字段
+- {get_language_instruction()}
 - 内容要与实体信息保持一致
-- age必须是有效的整数，gender必须是"male"或"female"
 """
 
     def _build_group_persona_prompt(
@@ -736,7 +728,7 @@ class OasisProfileGenerator:
         attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "无"
         context_str = context[:3000] if context else "无额外上下文"
         
-        return f"""为机构/群体实体生成详细的社交媒体账号设定,最大程度还原已有现实情况。
+        return f"""为机构/群体实体生成详细的加密货币/金融社交媒体官方账号设定,最大程度还原已有现实情况。
 
 实体名称: {entity_name}
 实体类型: {entity_type}
@@ -750,25 +742,23 @@ class OasisProfileGenerator:
 
 1. bio: 官方账号简介，200字，专业得体
 2. persona: 详细账号设定描述（2000字的纯文本），需包含:
-   - 机构基本信息（正式名称、机构性质、成立背景、主要职能）
-   - 账号定位（账号类型、目标受众、核心功能）
+   - 机构基本信息（正式名称、机构性质、主要职能）
+   - 账号定位（目标受众、核心功能、内容边界）
    - 发言风格（语言特点、常用表达、禁忌话题）
    - 发布内容特点（内容类型、发布频率、活跃时间段）
-   - 立场态度（对核心话题的官方立场、面对争议的处理方式）
-   - 特殊说明（代表的群体画像、运营习惯）
-   - 机构记忆（机构人设的重要部分，要介绍这个机构与事件的关联，以及这个机构在事件中的已有动作与反应）
-3. age: 固定填30（机构账号的虚拟年龄）
-4. gender: 固定填"other"（机构账号使用other表示非个人）
-5. mbti: MBTI类型，用于描述账号风格，如ISTJ代表严谨保守
-6. country: 国家（使用中文，如"中国"）
-7. profession: 机构职能描述
-8. interested_topics: 关注领域数组
+   - 立场态度（对核心话题/市场事件的官方立场、面对争议的处理方式）
+   - 机构记忆（与事件的关联，以及在该事件中的已有动作与反应）
+3. risk_tolerance: 固定填 moderate（机构账号默认中性风险偏好）
+4. trading_style: 固定填 long_term（机构账号偏长期/战略视角）
+5. experience_level: 固定填 advanced
+6. profession: 机构职能描述
+7. interested_topics: 关注领域数组
 
 重要:
-- 所有字段值必须是字符串或数字，不允许null值
+- 所有字段值必须是字符串或数组，不允许null值
 - persona必须是一段连贯的文字描述，不要使用换行符
-- {get_language_instruction()} (gender字段必须用英文"other")
-- age必须是整数30，gender必须是字符串"other"
+- 不要输出 age、gender、mbti、country 等人口统计字段
+- {get_language_instruction()}
 - 机构账号发言要符合其身份定位"""
     
     def _generate_profile_rule_based(
@@ -785,63 +775,57 @@ class OasisProfileGenerator:
         
         if entity_type_lower in ["student", "alumni"]:
             return {
-                "bio": f"{entity_type} with interests in academics and social issues.",
-                "persona": f"{entity_name} is a {entity_type.lower()} who is actively engaged in academic and social discussions. They enjoy sharing perspectives and connecting with peers.",
-                "age": random.randint(18, 30),
-                "gender": random.choice(["male", "female"]),
-                "mbti": random.choice(self.MBTI_TYPES),
-                "country": random.choice(self.COUNTRIES),
-                "profession": "Student",
-                "interested_topics": ["Education", "Social Issues", "Technology"],
+                "bio": f"{entity_type} interested in crypto markets and trading education.",
+                "persona": f"{entity_name} is a {entity_type.lower()} who follows crypto news, paper-trades small positions, and discusses market moves on social media.",
+                "risk_tolerance": "moderate",
+                "trading_style": "swing",
+                "experience_level": "beginner",
+                "profession": "Student Trader",
+                "interested_topics": ["Education", "BTC", "Altcoins"],
             }
         
         elif entity_type_lower in ["publicfigure", "expert", "faculty"]:
             return {
-                "bio": f"Expert and thought leader in their field.",
-                "persona": f"{entity_name} is a recognized {entity_type.lower()} who shares insights and opinions on important matters. They are known for their expertise and influence in public discourse.",
-                "age": random.randint(35, 60),
-                "gender": random.choice(["male", "female"]),
-                "mbti": random.choice(["ENTJ", "INTJ", "ENTP", "INTP"]),
-                "country": random.choice(self.COUNTRIES),
-                "profession": entity_attributes.get("occupation", "Expert"),
-                "interested_topics": ["Politics", "Economics", "Culture & Society"],
+                "bio": f"Market analyst and thought leader sharing macro and crypto views.",
+                "persona": f"{entity_name} is a recognized {entity_type.lower()} who comments on market structure, regulation, and major price moves with a research-driven tone.",
+                "risk_tolerance": "moderate",
+                "trading_style": "long_term",
+                "experience_level": "advanced",
+                "profession": entity_attributes.get("occupation", "Market Analyst"),
+                "interested_topics": ["Macro", "Regulation", "BTC"],
             }
         
         elif entity_type_lower in ["mediaoutlet", "socialmediaplatform"]:
             return {
-                "bio": f"Official account for {entity_name}. News and updates.",
-                "persona": f"{entity_name} is a media entity that reports news and facilitates public discourse. The account shares timely updates and engages with the audience on current events.",
-                "age": 30,  # 机构虚拟年龄
-                "gender": "other",  # 机构使用other
-                "mbti": "ISTJ",  # 机构风格：严谨保守
-                "country": "中国",
+                "bio": f"Official account for {entity_name}. Market news and updates.",
+                "persona": f"{entity_name} is a media entity covering crypto and financial markets, sharing timely updates and engaging audiences on breaking events.",
+                "risk_tolerance": "moderate",
+                "trading_style": "long_term",
+                "experience_level": "advanced",
                 "profession": "Media",
-                "interested_topics": ["General News", "Current Events", "Public Affairs"],
+                "interested_topics": ["Market News", "BTC", "Regulation"],
             }
         
         elif entity_type_lower in ["university", "governmentagency", "ngo", "organization"]:
             return {
                 "bio": f"Official account of {entity_name}.",
-                "persona": f"{entity_name} is an institutional entity that communicates official positions, announcements, and engages with stakeholders on relevant matters.",
-                "age": 30,  # 机构虚拟年龄
-                "gender": "other",  # 机构使用other
-                "mbti": "ISTJ",  # 机构风格：严谨保守
-                "country": "中国",
+                "persona": f"{entity_name} is an institutional entity communicating official positions on policy, compliance, and market developments.",
+                "risk_tolerance": "conservative",
+                "trading_style": "long_term",
+                "experience_level": "advanced",
                 "profession": entity_type,
-                "interested_topics": ["Public Policy", "Community", "Official Announcements"],
+                "interested_topics": ["Policy", "Compliance", "Market Structure"],
             }
         
         else:
-            # 默认人设
             return {
                 "bio": entity_summary[:150] if entity_summary else f"{entity_type}: {entity_name}",
-                "persona": entity_summary or f"{entity_name} is a {entity_type.lower()} participating in social discussions.",
-                "age": random.randint(25, 50),
-                "gender": random.choice(["male", "female"]),
-                "mbti": random.choice(self.MBTI_TYPES),
-                "country": random.choice(self.COUNTRIES),
+                "persona": entity_summary or f"{entity_name} is a {entity_type.lower()} participating in crypto market discussions.",
+                "risk_tolerance": random.choice(self.RISK_TOLERANCES),
+                "trading_style": random.choice(self.TRADING_STYLES),
+                "experience_level": random.choice(self.EXPERIENCE_LEVELS),
                 "profession": entity_type,
-                "interested_topics": ["General", "Social Issues"],
+                "interested_topics": ["Crypto", "Trading"],
             }
     
     def set_graph_id(self, graph_id: str):
@@ -1032,9 +1016,9 @@ class OasisProfileGenerator:
             f"【详细人设】",
             f"{profile.persona}",
             f"",
-            f"【基本属性】",
-            f"年龄: {profile.age} | 性别: {profile.gender} | MBTI: {profile.mbti}",
-            f"职业: {profile.profession} | 国家: {profile.country}",
+            f"【交易画像】",
+            f"风险偏好: {profile.risk_tolerance or '—'} | 交易风格: {profile.trading_style or '—'} | 经验层级: {profile.experience_level or '—'}",
+            f"角色: {profile.profession or '—'}",
             f"兴趣话题: {topics_str}",
             separator
         ]
@@ -1070,79 +1054,31 @@ class OasisProfileGenerator:
     def _save_twitter_csv(self, profiles: List[OasisAgentProfile], file_path: str):
         """
         保存Twitter Profile为CSV格式（符合OASIS官方要求）
-        
-        OASIS Twitter要求的CSV字段：
-        - user_id: 用户ID（根据CSV顺序从0开始）
-        - name: 用户真实姓名
-        - username: 系统中的用户名
-        - user_char: 详细人设描述（注入到LLM系统提示中，指导Agent行为）
-        - description: 简短的公开简介（显示在用户资料页面）
-        
-        user_char vs description 区别：
-        - user_char: 内部使用，LLM系统提示，决定Agent如何思考和行动
-        - description: 外部显示，其他用户可见的简介
+
+        OASIS Twitter 必需字段: user_id, name, username, user_char, description
+        额外列 risk_tolerance / trading_style / experience_level 供前端展示，OASIS 会忽略。
         """
         import csv
-        
-        # 确保文件扩展名是.csv
+
         if not file_path.endswith('.csv'):
             file_path = file_path.replace('.json', '.csv')
-        
+
+        rows = [p.to_twitter_csv_row(idx) for idx, p in enumerate(profiles)]
+        if not rows:
+            return
+
+        fieldnames: List[str] = []
+        for row in rows:
+            for key in row:
+                if key not in fieldnames:
+                    fieldnames.append(key)
+
         with open(file_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            
-            # 写入OASIS要求的表头
-            headers = ['user_id', 'name', 'username', 'user_char', 'description']
-            writer.writerow(headers)
-            
-            # 写入数据行
-            for idx, profile in enumerate(profiles):
-                # user_char: 完整人设（bio + persona），用于LLM系统提示
-                user_char = profile.bio
-                if profile.persona and profile.persona != profile.bio:
-                    user_char = f"{profile.bio} {profile.persona}"
-                # 处理换行符（CSV中用空格替代）
-                user_char = user_char.replace('\n', ' ').replace('\r', ' ')
-                
-                # description: 简短简介，用于外部显示
-                description = profile.bio.replace('\n', ' ').replace('\r', ' ')
-                
-                row = [
-                    idx,                    # user_id: 从0开始的顺序ID
-                    profile.name,           # name: 真实姓名
-                    profile.user_name,      # username: 用户名
-                    user_char,              # user_char: 完整人设（内部LLM使用）
-                    description             # description: 简短简介（外部显示）
-                ]
-                writer.writerow(row)
-        
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
         logger.info(f"已保存 {len(profiles)} 个Twitter Profile到 {file_path} (OASIS CSV格式)")
-    
-    def _normalize_gender(self, gender: Optional[str]) -> str:
-        """
-        标准化gender字段为OASIS要求的英文格式
-        
-        OASIS要求: male, female, other
-        """
-        if not gender:
-            return "other"
-        
-        gender_lower = gender.lower().strip()
-        
-        # 中文映射
-        gender_map = {
-            "男": "male",
-            "女": "female",
-            "机构": "other",
-            "其他": "other",
-            # 英文已有
-            "male": "male",
-            "female": "female",
-            "other": "other",
-        }
-        
-        return gender_map.get(gender_lower, "other")
-    
     def _save_reddit_json(self, profiles: List[OasisAgentProfile], file_path: str):
         """
         保存Reddit Profile为JSON格式
@@ -1156,27 +1092,21 @@ class OasisProfileGenerator:
         - name: 显示名称
         - bio: 简介
         - persona: 详细人设
-        - age: 年龄（整数）
-        - gender: "male", "female", 或 "other"
-        - mbti: MBTI类型
-        - country: 国家
+        - risk_tolerance / trading_style / experience_level: 交易画像
         """
         data = []
         for idx, profile in enumerate(profiles):
-            # 使用与 to_reddit_format() 一致的格式
             item = {
-                "user_id": profile.user_id if profile.user_id is not None else idx,  # 关键：必须包含 user_id
+                "user_id": profile.user_id if profile.user_id is not None else idx,
                 "username": profile.user_name,
                 "name": profile.name,
                 "bio": profile.bio[:150] if profile.bio else f"{profile.name}",
-                "persona": profile.persona or f"{profile.name} is a participant in social discussions.",
+                "persona": profile.persona or f"{profile.name} is a participant in market discussions.",
                 "karma": profile.karma if profile.karma else 1000,
                 "created_at": profile.created_at,
-                # OASIS必需字段 - 确保都有默认值
-                "age": profile.age if profile.age else 30,
-                "gender": self._normalize_gender(profile.gender),
-                "mbti": profile.mbti if profile.mbti else "ISTJ",
-                "country": profile.country if profile.country else "中国",
+                "risk_tolerance": profile.risk_tolerance or "moderate",
+                "trading_style": profile.trading_style or "swing",
+                "experience_level": profile.experience_level or "intermediate",
             }
             
             # 可选字段

@@ -737,19 +737,18 @@ const sendToAgent = async (message) => {
   
   if (res.success && res.data) {
     // 正确的数据路径: res.data.result.results 是一个对象字典
-    // 格式: {"twitter_0": {...}, "reddit_0": {...}} 或单平台 {"reddit_0": {...}}
+    // 格式: {"twitter_0": {...}, "twitter_1": {...}, ...}
     const resultData = res.data.result || res.data
     const resultsDict = resultData.results || resultData
     
-    // 将对象字典转换为数组，优先获取 reddit 平台的回复
+    // 将对象字典转换为数组，获取 Twitter 平台回复
     let responseContent = null
     const agentId = selectedAgentIndex.value
     
     if (typeof resultsDict === 'object' && !Array.isArray(resultsDict)) {
-      // 优先使用 reddit 平台回复，其次 twitter
-      const redditKey = `reddit_${agentId}`
+      // 优先使用 Twitter 平台回复
       const twitterKey = `twitter_${agentId}`
-      const agentResult = resultsDict[redditKey] || resultsDict[twitterKey] || Object.values(resultsDict)[0]
+      const agentResult = resultsDict[twitterKey] || Object.values(resultsDict)[0]
       if (agentResult) {
         responseContent = agentResult.response || agentResult.answer
       }
@@ -821,7 +820,7 @@ const submitSurvey = async () => {
     
     if (res.success && res.data) {
       // 正确的数据路径: res.data.result.results 是一个对象字典
-      // 格式: {"twitter_0": {...}, "reddit_0": {...}, "twitter_1": {...}, ...}
+      // 格式: {"twitter_0": {...}, "twitter_1": {...}, ...}
       const resultData = res.data.result || res.data
       const resultsDict = resultData.results || resultData
       
@@ -832,13 +831,11 @@ const submitSurvey = async () => {
         const agentIdx = interview.agent_id
         const agent = profiles.value[agentIdx]
         
-        // 优先使用 reddit 平台回复，其次 twitter
         let responseContent = t('step5.noResponse')
 
         if (typeof resultsDict === 'object' && !Array.isArray(resultsDict)) {
-          const redditKey = `reddit_${agentIdx}`
           const twitterKey = `twitter_${agentIdx}`
-          const agentResult = resultsDict[redditKey] || resultsDict[twitterKey]
+          const agentResult = resultsDict[twitterKey]
           if (agentResult) {
             responseContent = agentResult.response || agentResult.answer || t('step5.noResponse')
           }
@@ -918,7 +915,7 @@ const loadProfiles = async () => {
   if (!props.simulationId) return
   
   try {
-    const res = await getSimulationProfilesRealtime(props.simulationId, 'reddit')
+    const res = await getSimulationProfilesRealtime(props.simulationId, 'twitter')
     if (res.success && res.data) {
       profiles.value = res.data.profiles || []
       addLog(t('log.loadedProfiles', { count: profiles.value.length }))

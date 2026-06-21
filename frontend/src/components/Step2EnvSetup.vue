@@ -26,7 +26,7 @@
             >
               <input type="checkbox" :value="c.character_id" v-model="selectedCharacterIds" />
               <span class="roster-name">{{ c.name }}</span>
-              <span class="roster-meta">{{ c.region || '—' }}</span>
+              <span class="roster-meta">{{ c.main_product || c.user_source || '—' }}</span>
               <span v-if="c.vip_level != null" class="roster-chip">VIP {{ c.vip_level }}</span>
               <span class="roster-assets">{{ c.main_coin || (c.preferred_assets || [])[0] || '' }}</span>
             </label>
@@ -171,12 +171,12 @@
         </div>
       </div>
 
-      <!-- Step 03: 生成双平台模拟配置 -->
+      <!-- Step 03: 生成模拟配置 -->
       <div class="step-card" :class="{ 'active': phase === 2, 'completed': phase > 2 }">
         <div class="card-header">
           <div class="step-info">
             <span class="step-num">03</span>
-            <span class="step-title">{{ $t('step2.dualPlatformConfig') }}</span>
+            <span class="step-title">{{ $t('step2.simulationConfig') }}</span>
           </div>
           <div class="step-status">
             <span v-if="phase > 2" class="badge success">{{ $t('common.completed') }}</span>
@@ -188,7 +188,7 @@
         <div class="card-content">
           <p class="api-note">POST /api/simulation/prepare</p>
           <p class="description">
-            {{ $t('step2.dualPlatformConfigDesc') }}
+            {{ $t('step2.simulationConfigDesc') }}
           </p>
           
           <!-- Config Preview -->
@@ -352,33 +352,6 @@
                     <div class="param-row">
                       <span class="param-label">{{ $t('step2.echoChamberStrength') }}</span>
                       <span class="param-value">{{ simulationConfig.twitter_config.echo_chamber_strength }}</span>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="simulationConfig.reddit_config" class="platform-card">
-                  <div class="platform-card-header">
-                    <span class="platform-name">{{ $t('step2.platform2Name') }}</span>
-                  </div>
-                  <div class="platform-params">
-                    <div class="param-row">
-                      <span class="param-label">{{ $t('step2.recencyWeight') }}</span>
-                      <span class="param-value">{{ simulationConfig.reddit_config.recency_weight }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">{{ $t('step2.popularityWeight') }}</span>
-                      <span class="param-value">{{ simulationConfig.reddit_config.popularity_weight }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">{{ $t('step2.relevanceWeight') }}</span>
-                      <span class="param-value">{{ simulationConfig.reddit_config.relevance_weight }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">{{ $t('step2.viralThreshold') }}</span>
-                      <span class="param-value">{{ simulationConfig.reddit_config.viral_threshold }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">{{ $t('step2.echoChamberStrength') }}</span>
-                      <span class="param-value">{{ simulationConfig.reddit_config.echo_chamber_strength }}</span>
                     </div>
                   </div>
                 </div>
@@ -567,7 +540,7 @@
             </Transition>
           </div>
 
-          <div class="action-group dual">
+          <div class="action-group">
             <button 
               class="action-btn secondary"
               @click="$emit('go-back')"
@@ -579,7 +552,7 @@
               :disabled="phase < 4"
               @click="handleStartSimulation"
             >
-              {{ $t('step2.startDualWorldSim') }} ➝
+              {{ $t('step2.startSimulation') }} ➝
             </button>
           </div>
         </div>
@@ -602,23 +575,25 @@
         </div>
         
         <div class="modal-body">
-          <!-- 基本信息 -->
-          <div class="modal-info-grid">
-            <div class="info-item">
-              <span class="info-label">{{ $t('step2.profileModalAge') }}</span>
-              <span class="info-value">{{ selectedProfile.age || '-' }} {{ $t('step2.yearsOld') }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">{{ $t('step2.profileModalGender') }}</span>
-              <span class="info-value">{{ { male: $t('step2.genderMale'), female: $t('step2.genderFemale'), other: $t('step2.genderOther') }[selectedProfile.gender] || selectedProfile.gender }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">{{ $t('step2.profileModalCountry') }}</span>
-              <span class="info-value">{{ selectedProfile.country || '-' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">{{ $t('step2.profileModalMbti') }}</span>
-              <span class="info-value mbti">{{ selectedProfile.mbti || '-' }}</span>
+          <!-- 交易画像 -->
+          <div
+            class="modal-section"
+            v-if="selectedProfile.risk_tolerance || selectedProfile.trading_style || selectedProfile.experience_level"
+          >
+            <span class="section-label">{{ $t('step2.profileModalTrading') }}</span>
+            <div class="trading-profile-grid">
+              <div v-if="selectedProfile.risk_tolerance" class="trading-profile-item">
+                <span class="tp-label">{{ $t('step2.profileModalRisk') }}</span>
+                <span class="tp-value">{{ selectedProfile.risk_tolerance }}</span>
+              </div>
+              <div v-if="selectedProfile.trading_style" class="trading-profile-item">
+                <span class="tp-label">{{ $t('step2.profileModalStyle') }}</span>
+                <span class="tp-value">{{ selectedProfile.trading_style }}</span>
+              </div>
+              <div v-if="selectedProfile.experience_level" class="trading-profile-item">
+                <span class="tp-label">{{ $t('step2.profileModalExperience') }}</span>
+                <span class="tp-value">{{ selectedProfile.experience_level }}</span>
+              </div>
             </div>
           </div>
 
@@ -993,7 +968,7 @@ const fetchProfilesRealtime = async () => {
   if (!props.simulationId) return
   
   try {
-    const res = await getSimulationProfilesRealtime(props.simulationId, 'reddit')
+    const res = await getSimulationProfilesRealtime(props.simulationId, 'twitter')
     
     if (res.success && res.data) {
       const prevCount = profiles.value.length
@@ -1075,7 +1050,7 @@ const fetchConfigRealtime = async () => {
           addLog(t('log.configSummaryHours', { hours: data.summary.simulation_hours }))
           addLog(t('log.configSummaryPosts', { count: data.summary.initial_posts_count }))
           addLog(t('log.configSummaryTopics', { count: data.summary.hot_topics_count }))
-          addLog(t('log.configSummaryPlatforms', { twitter: data.summary.has_twitter_config ? '✓' : '✗', reddit: data.summary.has_reddit_config ? '✓' : '✗' }))
+          addLog(t('log.configSummaryPlatform', { ok: data.summary.has_twitter_config ? '✓' : '✗' }))
         }
         
         // 显示时间配置详情
@@ -1154,7 +1129,7 @@ const filteredLibrary = computed(() => {
   const q = rosterQuery.value.trim().toLowerCase()
   if (!q) return libraryCharacters.value
   return libraryCharacters.value.filter(c =>
-    `${c.name || ''} ${c.uid || ''} ${c.region || ''} ${c.main_product || ''} ${c.main_coin || ''} ${(c.preferred_assets || []).join(' ')}`
+    `${c.name || ''} ${c.uid || ''} ${c.main_product || ''} ${c.main_coin || ''} ${c.user_source || ''} ${(c.preferred_assets || []).join(' ')}`
       .toLowerCase().includes(q)
   )
 })
@@ -1512,17 +1487,13 @@ onUnmounted(() => {
 }
 
 .action-group {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-top: 16px;
 }
 
-.action-group.dual {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-.action-group.dual .action-btn {
+.action-group .action-btn {
   width: 100%;
 }
 
@@ -2196,42 +2167,6 @@ onUnmounted(() => {
   flex: 1;
 }
 
-/* 基本信息网格 */
-.modal-info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px 16px;
-  margin-bottom: 32px;
-  padding: 0;
-  background: transparent;
-  border-radius: 0;
-}
-
-.info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.info-label {
-  font-size: 11px;
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
-}
-
-.info-value {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-body);
-}
-
-.info-value.mbti {
-  font-family: 'JetBrains Mono', monospace;
-  color: var(--accent);
-}
-
 /* 模块区域 */
 .modal-section {
   margin-bottom: 28px;
@@ -2256,6 +2191,43 @@ onUnmounted(() => {
   background: var(--bg-subtle);
   border-radius: 6px;
   border-left: 3px solid var(--border);
+}
+
+.trading-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.trading-profile-item {
+  padding: 12px 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.tp-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.tp-value {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-strong);
+  text-transform: capitalize;
+}
+
+@media (max-width: 720px) {
+  .trading-profile-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* 话题标签 */

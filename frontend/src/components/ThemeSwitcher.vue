@@ -28,12 +28,16 @@ const { resolvedTheme, toggleTheme } = useTheme()
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 30px;
+  box-sizing: border-box;
+  width: var(--header-control-height, 32px);
+  height: var(--header-control-height, 32px);
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
   background: transparent;
   color: var(--text-muted, #666);
   border: 1px solid var(--border-strong, #ccc);
-  border-radius: 6px;
+  border-radius: var(--header-control-radius, 6px);
   cursor: pointer;
   transition: border-color 0.2s, color 0.2s, background 0.2s;
 }

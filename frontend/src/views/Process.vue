@@ -2,7 +2,10 @@
   <div class="process-page">
     <!-- 顶部导航栏 -->
     <nav class="navbar">
-      <div class="nav-brand" @click="goHome">DIGITAL TWIN AGENT SANDBOX</div>
+      <div class="nav-brand" @click="goHome">
+        <AppLogo size="sm" />
+        <span>DIGITAL TWIN AGENT SANDBOX</span>
+      </div>
       
       <!-- 中间步骤指示器 -->
       <div class="nav-center">
@@ -412,6 +415,7 @@
 </template>
 
 <script setup>
+import AppLogo from '../components/AppLogo.vue'
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { generateOntology, getProject, buildGraph, getTaskStatus, getGraphData } from '../api/graph'
