@@ -226,18 +226,93 @@ class SimulationRunner:
     
     # 图谱记忆更新配置
     _graph_memory_enabled: Dict[str, bool] = {}  # simulation_id -> enabled
+    _log_sync_positions: Dict[str, Dict[str, int]] = {}  # simulation_id -> {platform: byte_offset}
     
     @classmethod
     def get_run_state(cls, simulation_id: str) -> Optional[SimulationRunState]:
         """获取运行状态"""
-        if simulation_id in cls._run_states:
-            return cls._run_states[simulation_id]
+        state = cls._run_states.get(simulation_id)
+        if not state:
+            state = cls._load_run_state(simulation_id)
+            if state:
+                cls._run_states[simulation_id] = state
         
-        # 尝试从文件加载
-        state = cls._load_run_state(simulation_id)
-        if state:
-            cls._run_states[simulation_id] = state
+        if state and state.runner_status in [RunnerStatus.RUNNING, RunnerStatus.STARTING]:
+            cls._sync_state_from_action_logs(state)
+            cls._reconcile_stale_process(state)
+        
         return state
+    
+    @classmethod
+    def _sync_state_from_action_logs(cls, state: SimulationRunState):
+        """从 actions.jsonl 同步进度（后端重启后 monitor 线程丢失时使用）"""
+        sim_dir = os.path.join(cls.RUN_STATE_DIR, state.simulation_id)
+        positions = cls._log_sync_positions.setdefault(state.simulation_id, {})
+        
+        twitter_log = os.path.join(sim_dir, "twitter", "actions.jsonl")
+        if os.path.exists(twitter_log):
+            positions["twitter"] = cls._read_action_log(
+                twitter_log, positions.get("twitter", 0), state, "twitter"
+            )
+        
+        reddit_log = os.path.join(sim_dir, "reddit", "actions.jsonl")
+        if os.path.exists(reddit_log):
+            positions["reddit"] = cls._read_action_log(
+                reddit_log, positions.get("reddit", 0), state, "reddit"
+            )
+        
+        cls._save_run_state(state)
+    
+    @classmethod
+    def _reconcile_stale_process(cls, state: SimulationRunState):
+        """检测已退出但未更新状态的模拟进程"""
+        if state.runner_status in [RunnerStatus.COMPLETED, RunnerStatus.FAILED, RunnerStatus.STOPPED]:
+            return
+        
+        if cls._processes.get(state.simulation_id) is not None:
+            return
+        
+        pid = state.process_pid
+        if pid:
+            try:
+                os.kill(pid, 0)
+                return
+            except ProcessLookupError:
+                pass
+            except PermissionError:
+                return
+        
+        sim_dir = os.path.join(cls.RUN_STATE_DIR, state.simulation_id)
+        env_status_path = os.path.join(sim_dir, "env_status.json")
+        if os.path.exists(env_status_path):
+            try:
+                with open(env_status_path, 'r', encoding='utf-8') as f:
+                    env_status = json.load(f)
+                if env_status.get("status") == "alive":
+                    state.twitter_completed = True
+                    state.twitter_running = False
+                    state.runner_status = RunnerStatus.COMPLETED
+                    state.completed_at = state.completed_at or datetime.now().isoformat()
+                    state.error = None
+                    cls._save_run_state(state)
+                    return
+            except Exception:
+                pass
+        
+        if cls._check_all_platforms_completed(state):
+            state.runner_status = RunnerStatus.COMPLETED
+            state.completed_at = state.completed_at or datetime.now().isoformat()
+            state.twitter_running = False
+            state.reddit_running = False
+            cls._save_run_state(state)
+            return
+        
+        if pid:
+            state.runner_status = RunnerStatus.FAILED
+            state.error = state.error or "Simulation process exited unexpectedly"
+            state.twitter_running = False
+            state.reddit_running = False
+            cls._save_run_state(state)
     
     @classmethod
     def _load_run_state(cls, simulation_id: str) -> Optional[SimulationRunState]:
@@ -368,6 +443,7 @@ class SimulationRunner:
         )
         
         cls._save_run_state(state)
+        cls._log_sync_positions.pop(simulation_id, None)
         
         # 如果启用图谱记忆更新，创建更新器
         if enable_graph_memory_update:

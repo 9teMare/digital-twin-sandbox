@@ -115,6 +115,8 @@ def setup_oasis_logging(log_dir: str):
         logger.propagate = False
 
 
+from action_logger import PlatformActionLogger
+
 try:
     from camel.models import ModelFactory
     from camel.types import ModelPlatformType
@@ -580,6 +582,14 @@ class TwitterSimulationRunner:
             model=model,
             available_actions=self.AVAILABLE_ACTIONS,
         )
+
+        from run_parallel_simulation import fetch_new_actions_from_db, get_agent_names_from_config
+
+        action_logger = PlatformActionLogger("twitter", self.simulation_dir)
+        agent_names = get_agent_names_from_config(self.config)
+        for agent_id, agent in self.agent_graph.get_agents():
+            if agent_id not in agent_names:
+                agent_names[agent_id] = getattr(agent, 'name', f'Agent_{agent_id}')
         
         # 数据库路径
         db_path = self._get_db_path()
@@ -603,9 +613,15 @@ class TwitterSimulationRunner:
         self.ipc_handler = IPCHandler(self.simulation_dir, self.env, self.agent_graph)
         self.ipc_handler.update_status("running")
         
+        action_logger.log_simulation_start(self.config)
+        total_actions = 0
+        last_rowid = 0
+
         # 执行初始事件
         event_config = self.config.get("event_config", {})
         initial_posts = event_config.get("initial_posts", [])
+        action_logger.log_round_start(0, 0)
+        initial_action_count = 0
         
         if initial_posts:
             print(f"执行初始事件 ({len(initial_posts)}条初始帖子)...")
@@ -619,12 +635,34 @@ class TwitterSimulationRunner:
                         action_type=ActionType.CREATE_POST,
                         action_args={"content": content}
                     )
+                    action_logger.log_action(
+                        round_num=0,
+                        agent_id=agent_id,
+                        agent_name=agent_names.get(agent_id, f"Agent_{agent_id}"),
+                        action_type="create_post",
+                        action_args={"content": content},
+                    )
                 except Exception as e:
                     print(f"  警告: 无法为Agent {agent_id}创建初始帖子: {e}")
             
             if initial_actions:
                 await self.env.step(initial_actions)
+                initial_action_count = len(initial_actions)
+                total_actions += initial_action_count
                 print(f"  已发布 {len(initial_actions)} 条初始帖子")
+
+        actual_actions, last_rowid = fetch_new_actions_from_db(db_path, last_rowid, agent_names)
+        for action_data in actual_actions:
+            action_logger.log_action(
+                round_num=0,
+                agent_id=action_data['agent_id'],
+                agent_name=action_data['agent_name'],
+                action_type=action_data['action_type'],
+                action_args=action_data['action_args'],
+            )
+            total_actions += 1
+            initial_action_count += 1
+        action_logger.log_round_end(0, initial_action_count)
         
         # 主模拟循环
         print("\n开始模拟循环...")
@@ -640,8 +678,11 @@ class TwitterSimulationRunner:
             active_agents = self._get_active_agents_for_round(
                 self.env, simulated_hour, round_num
             )
+
+            action_logger.log_round_start(round_num + 1, simulated_hour)
             
             if not active_agents:
+                action_logger.log_round_end(round_num + 1, 0)
                 continue
             
             # 构建动作
@@ -652,6 +693,20 @@ class TwitterSimulationRunner:
             
             # 执行动作
             await self.env.step(actions)
+
+            actual_actions, last_rowid = fetch_new_actions_from_db(db_path, last_rowid, agent_names)
+            round_action_count = 0
+            for action_data in actual_actions:
+                action_logger.log_action(
+                    round_num=round_num + 1,
+                    agent_id=action_data['agent_id'],
+                    agent_name=action_data['agent_name'],
+                    action_type=action_data['action_type'],
+                    action_args=action_data['action_args'],
+                )
+                total_actions += 1
+                round_action_count += 1
+            action_logger.log_round_end(round_num + 1, round_action_count)
             
             # 打印进度
             if (round_num + 1) % 10 == 0 or round_num == 0:
@@ -662,9 +717,12 @@ class TwitterSimulationRunner:
                       f"- {len(active_agents)} agents active "
                       f"- elapsed: {elapsed:.1f}s")
         
+        action_logger.log_simulation_end(total_rounds, total_actions)
+
         total_elapsed = (datetime.now() - start_time).total_seconds()
         print(f"\n模拟循环完成!")
         print(f"  - 总耗时: {total_elapsed:.1f}秒")
+        print(f"  - 总动作: {total_actions}")
         print(f"  - 数据库: {db_path}")
         
         # 是否进入等待命令模式
