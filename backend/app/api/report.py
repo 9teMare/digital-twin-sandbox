@@ -69,9 +69,10 @@ def generate_report():
                 "error": t('api.simulationNotFound', id=simulation_id)
             }), 404
 
+        existing_report = ReportManager.get_report_by_simulation(simulation_id)
+
         # 检查是否已有报告
         if not force_regenerate:
-            existing_report = ReportManager.get_report_by_simulation(simulation_id)
             if existing_report and existing_report.status == ReportStatus.COMPLETED:
                 return jsonify({
                     "success": True,
@@ -83,6 +84,24 @@ def generate_report():
                         "already_generated": True
                     }
                 })
+            if existing_report and existing_report.status in (
+                ReportStatus.PENDING,
+                ReportStatus.PLANNING,
+                ReportStatus.GENERATING,
+            ):
+                return jsonify({
+                    "success": True,
+                    "data": {
+                        "simulation_id": simulation_id,
+                        "report_id": existing_report.report_id,
+                        "status": existing_report.status.value,
+                        "message": t('api.reportGenerateInProgress'),
+                        "already_in_progress": True
+                    }
+                })
+        elif existing_report:
+            ReportManager.delete_report(existing_report.report_id)
+            logger.info(f"已删除旧报告以便重新生成: {existing_report.report_id}")
         
         # 获取项目信息
         project = ProjectManager.get_project(state.project_id)

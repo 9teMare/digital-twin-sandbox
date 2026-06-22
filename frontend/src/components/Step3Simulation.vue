@@ -577,9 +577,20 @@ const handleNextStep = async () => {
     
     if (res.success && res.data) {
       const reportId = res.data.report_id
+
+      if (res.data.already_in_progress && reportId) {
+        addLog(t('log.reportGenTaskStarted', { reportId }))
+        router.push({ name: 'Report', params: { reportId } })
+        return
+      }
+
+      if (res.data.already_generated && reportId) {
+        addLog(t('log.reportGenTaskStarted', { reportId }))
+        router.push({ name: 'Report', params: { reportId } })
+        return
+      }
+
       addLog(t('log.reportGenTaskStarted', { reportId }))
-      
-      // 跳转到报告页面
       router.push({ name: 'Report', params: { reportId } })
     } else {
       addLog(t('log.reportGenFailed', { error: res.error || t('common.unknownError') }))

@@ -43,6 +43,22 @@ export const getReport = (reportId) => {
 }
 
 /**
+ * 获取报告生成进度
+ * @param {string} reportId
+ */
+export const getReportProgress = (reportId) => {
+  return service.get(`/api/report/${reportId}/progress`)
+}
+
+/**
+ * 获取已生成的章节（用于恢复/刷新页面状态）
+ * @param {string} reportId
+ */
+export const getReportSections = (reportId) => {
+  return service.get(`/api/report/${reportId}/sections`)
+}
+
+/**
  * 与 Report Agent 对话
  * @param {Object} data - { simulation_id, message, chat_history? }
  */

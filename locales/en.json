@@ -367,6 +367,8 @@
   "step4": {
     "generatingSection": "Generating {title}...",
     "goToInteraction": "Enter Deep Interaction",
+    "regenerateReport": "Regenerate report",
+    "regeneratingReport": "Regenerating...",
     "waitingForReportAgent": "Waiting for Report Agent...",
     "collapse": "Collapse ▲",
     "expandAll": "Show all {count} ▼",
@@ -525,6 +527,7 @@
     "missingGraphIdEnsure": "Missing graph ID. Please ensure the graph has been built.",
     "missingSimRequirement": "Missing simulation requirement description",
     "reportAlreadyExists": "Report already exists",
+    "reportGenerateInProgress": "Report generation already in progress",
     "reportGenerateStarted": "Report generation task started. Query progress via /api/report/generate/status.",
     "reportGenerated": "Report generated",
     "reportNotFound": "Report not found: {id}",

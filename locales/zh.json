@@ -373,6 +373,8 @@
   "step4": {
     "generatingSection": "正在生成{title}...",
     "goToInteraction": "进入深度互动",
+    "regenerateReport": "重新生成报告",
+    "regeneratingReport": "重新生成中...",
     "waitingForReportAgent": "Waiting for Report Agent...",
     "collapse": "收起 ▲",
     "expandAll": "展开全部 {count} 条 ▼",
@@ -531,6 +533,7 @@
     "missingGraphIdEnsure": "缺少图谱ID，请确保已构建图谱",
     "missingSimRequirement": "缺少模拟需求描述",
     "reportAlreadyExists": "报告已存在",
+    "reportGenerateInProgress": "报告正在生成中",
     "reportGenerateStarted": "报告生成任务已启动，请通过 /api/report/generate/status 查询进度",
     "reportGenerated": "报告已生成",
     "reportNotFound": "报告不存在: {id}",

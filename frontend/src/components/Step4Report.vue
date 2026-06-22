@@ -136,6 +136,16 @@
             </svg>
           </button>
 
+          <button
+            v-else-if="simulationId"
+            class="regenerate-report-btn"
+            :disabled="isRegenerating"
+            @click="handleRegenerate"
+          >
+            <span v-if="isRegenerating">{{ $t('step4.regeneratingReport') }}</span>
+            <span v-else>{{ $t('step4.regenerateReport') }}</span>
+          </button>
+
           <div class="workflow-divider"></div>
         </div>
 
@@ -390,10 +400,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, h, reactive } from 'vue'
+import { ref, computed, watch, onUnmounted, nextTick, h, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getAgentLog, getConsoleLog } from '../api/report'
+import { getAgentLog, getConsoleLog, getReport, getReportProgress, getReportSections, generateReport } from '../api/report'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -425,6 +435,7 @@ const expandedContent = ref(new Set())
 const expandedLogs = ref(new Set())
 const collapsedSections = ref(new Set())
 const isComplete = ref(false)
+const isRegenerating = ref(false)
 const startTime = ref(null)
 const leftPanel = ref(null)
 const rightPanel = ref(null)
@@ -1956,6 +1967,87 @@ const getLogLevelClass = (log) => {
 // Polling
 let agentLogTimer = null
 let consoleLogTimer = null
+let progressTimer = null
+
+const syncFromServer = async () => {
+  if (!props.reportId) return
+
+  try {
+    const reportRes = await getReport(props.reportId)
+    if (reportRes.success && reportRes.data) {
+      if (reportRes.data.outline) {
+        reportOutline.value = reportRes.data.outline
+      }
+      if (reportRes.data.status === 'completed') {
+        isComplete.value = true
+        currentSectionIndex.value = null
+        emit('update-status', 'completed')
+      } else if (reportRes.data.status === 'failed') {
+        emit('update-status', 'error')
+      }
+    }
+
+    const sectionsRes = await getReportSections(props.reportId)
+    if (sectionsRes.success && sectionsRes.data?.sections?.length) {
+      sectionsRes.data.sections.forEach((section) => {
+        generatedSections.value[section.section_index] = section.content
+      })
+      if (sectionsRes.data.is_complete) {
+        isComplete.value = true
+        currentSectionIndex.value = null
+        emit('update-status', 'completed')
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to sync report state:', err)
+  }
+}
+
+const fetchReportProgress = async () => {
+  if (!props.reportId || isComplete.value) return
+
+  try {
+    const res = await getReportProgress(props.reportId)
+    if (res.success && res.data?.status === 'completed') {
+      await syncFromServer()
+      stopPolling()
+    } else if (res.success && res.data?.status === 'failed') {
+      emit('update-status', 'error')
+      stopPolling()
+    }
+  } catch (err) {
+    console.warn('Failed to fetch report progress:', err)
+  }
+}
+
+const handleRegenerate = async () => {
+  if (!props.simulationId || isRegenerating.value) return
+
+  isRegenerating.value = true
+  stopPolling()
+
+  try {
+    const res = await generateReport({
+      simulation_id: props.simulationId,
+      force_regenerate: true
+    })
+
+    if (res.success && res.data?.report_id) {
+      if (res.data.already_generated && res.data.report_id === props.reportId) {
+        await syncFromServer()
+        startPolling()
+        return
+      }
+      router.push({ name: 'Report', params: { reportId: res.data.report_id } })
+    } else {
+      emit('add-log', `Failed to regenerate report: ${res.error || 'Unknown error'}`)
+    }
+  } catch (err) {
+    emit('add-log', `Failed to regenerate report: ${err.message}`)
+  } finally {
+    isRegenerating.value = false
+  }
+}
 
 const fetchAgentLog = async () => {
   if (!props.reportId) return
@@ -2095,9 +2187,11 @@ const startPolling = () => {
   
   fetchAgentLog()
   fetchConsoleLog()
+  fetchReportProgress()
   
   agentLogTimer = setInterval(fetchAgentLog, 2000)
   consoleLogTimer = setInterval(fetchConsoleLog, 1500)
+  progressTimer = setInterval(fetchReportProgress, 5000)
 }
 
 const stopPolling = () => {
@@ -2109,21 +2203,18 @@ const stopPolling = () => {
     clearInterval(consoleLogTimer)
     consoleLogTimer = null
   }
+  if (progressTimer) {
+    clearInterval(progressTimer)
+    progressTimer = null
+  }
 }
 
 // Lifecycle
-onMounted(() => {
-  if (props.reportId) {
-    addLog(`Report Agent initialized: ${props.reportId}`)
-    startPolling()
-  }
-})
-
 onUnmounted(() => {
   stopPolling()
 })
 
-watch(() => props.reportId, (newId) => {
+watch(() => props.reportId, async (newId) => {
   if (newId) {
     agentLogs.value = []
     consoleLogs.value = []
@@ -2136,9 +2227,15 @@ watch(() => props.reportId, (newId) => {
     expandedLogs.value = new Set()
     collapsedSections.value = new Set()
     isComplete.value = false
+    isRegenerating.value = false
     startTime.value = null
     
-    startPolling()
+    stopPolling()
+    addLog(`Report Agent initialized: ${newId}`)
+    await syncFromServer()
+    if (!isComplete.value) {
+      startPolling()
+    }
   }
 }, { immediate: true })
 </script>
@@ -3366,6 +3463,33 @@ watch(() => props.reportId, (newId) => {
 
 .next-step-btn:hover svg {
   transform: translateX(4px);
+}
+
+.regenerate-report-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(100% - 40px);
+  margin: 4px 20px 0 20px;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.regenerate-report-btn:hover:not(:disabled) {
+  border-color: var(--violet);
+  background: rgba(109, 91, 255, 0.08);
+}
+
+.regenerate-report-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Workflow Empty */
